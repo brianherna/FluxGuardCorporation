@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FluxGuard — Acceso</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,700;1,900&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="login-page premium-login">
+
+  <div class="login-background"></div>
+  <div class="login-noise"></div>
+
+  <a href="index.html" class="login-back premium-back" aria-label="Volver al inicio">
+    <i class="bi bi-arrow-left"></i> VOLVER AL INICIO
+  </a>
+
+  <div class="login-index">FLUXGUARD / 01 — ACCESO</div>
+
+  <div class="login-wrapper premium-login-wrapper">
+    <!-- INTRO IZQUIERDA -->
+    <section class="login-intro premium-intro">
+      <a class="login-brand login-brand-logo" href="index.html" aria-label="FluxGuard - Inicio">
+        <img src="assets/fluxguard-logo-full.png" alt="FluxGuard">
+      </a>
+      <span class="section-eyebrow"><span></span> PLATAFORMA</span>
+      <h1>Tu información.<br><em>Tu control.</em></h1>
+      <p>Una sola plataforma para visualizar, organizar y analizar la información de tu infraestructura eléctrica.</p>
+      <div class="login-feature-list">
+        <div><b>01</b><span>Datos centralizados</span></div>
+        <div><b>02</b><span>Monitoreo continuo</span></div>
+        <div><b>03</b><span>Acceso protegido</span></div>
+      </div>
+    </section>
+
+    <!-- CARD FORMULARIO DERECHA -->
+    <section class="login-card premium-login-card">
+      <div class="premium-card-top">
+        <span>ACCESO SEGURO</span>
+        <span>01 / 01</span>
+      </div>
+
+      <div class="login-lock">
+        <i class="bi bi-lock-fill fs-4"></i>
+      </div>
+
+      <h2>Iniciar sesión</h2>
+      <p class="login-description">Ingresa tus credenciales para continuar.</p>
+
+      <div id="login-alert" class="d-none"></div>
+
+      <form id="login-form">
+        <div class="login-field">
+          <label for="login-email">Correo electrónico</label>
+          <div class="login-input-wrapper position-relative">
+            <input id="login-email" type="email" placeholder="correo@ejemplo.com" required>
+          </div>
+        </div>
+
+        <div class="login-field">
+          <label for="login-password">Contraseña</label>
+          <div class="login-input-wrapper position-relative">
+            <input id="login-password" type="password" placeholder="••••••••" required>
+            <button type="button" class="password-toggle-btn" data-target="login-password">
+              <i class="bi bi-eye"></i>
+            </button>
+          </div>
+          <small class="text-white-50 mt-1 d-block" style="font-size:11px;">Mínimo 8 caracteres, al menos una mayúscula y un carácter especial.</small>
+        </div>
+
+        <button type="submit" id="btn-login-submit" class="login-submit premium-submit">
+          <span>ENTRAR A FLUXGUARD</span>
+          <i class="bi bi-arrow-up-right"></i>
+        </button>
+      </form>
+
+      <div class="login-register">
+        <span>¿Aún no tienes acceso?</span>
+        <a href="crear-cuenta.html">Crear una cuenta <i class="bi bi-arrow-up-right"></i></a>
+      </div>
+
+      <div class="text-center mt-3 pt-2 border-top border-secondary border-opacity-25">
+        <button type="button" id="btn-reset-cache" class="btn btn-link text-white-50 text-decoration-none py-0" style="font-size:11px;">
+          <i class="bi bi-trash3 me-1 text-danger"></i> Limpiar correos y sesiones guardadas
+        </button>
+      </div>
+
+      <div class="d-flex align-items-center gap-2 mt-3 text-secondary small">
+        <i class="bi bi-shield-check" style="color:var(--gold);"></i>
+        <span>Conexión y credenciales protegidas con MongoDB Atlas.</span>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>

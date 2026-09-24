@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0b0812">
+  <title>FluxGuard — Monitoreo y Protección de Redes Eléctricas</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,700;1,900&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <!-- Bootstrap Icons -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <!-- Bootstrap 5 CSS (Dropdowns & Modals) -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+
+  <!-- Estilos Maestros de FluxGuard -->
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <!-- FluxGuard: versión corregida y lista para GitHub Pages -->
+
+  <!-- ================= NAVBAR ================= -->
+  <header class="navbar">
+    <a href="#inicio" class="navbar-logo" aria-label="FluxGuard - Inicio">
+      <img src="assets/fluxguard-logo-full.png" class="navbar-logo-image" alt="FluxGuard">
+    </a>
+
+    <nav class="navbar-links" id="navbarMenu">
+      <a href="#inicio">Inicio</a>
+      <a href="#quienes-somos">Equipo</a>
+      <a href="#como-funciona">Cómo funciona</a>
+      <a href="#servicios">Servicios</a>
+      <a href="#plataforma">Plataforma</a>
+      <a href="#ubicacion">Ubicación</a>
+      <a href="planes.html">Planes</a>
+      <a href="contacto.html">Contacto</a>
+    </nav>
+
+    <div class="navbar-actions" id="navbar-auth-action">
+      <a href="login.html" class="navbar-panel">
+        Iniciar sesión <i class="bi bi-arrow-up-right"></i>
+      </a>
+    </div>
+
+    <button type="button" class="navbar-mobile-toggle" id="navbarToggle" aria-label="Abrir menú">
+      <i class="bi bi-list fs-4"></i>
+    </button>
+  </header>
+
+  <!-- ================= HERO CINEMATIC ================= -->
+  <section class="hero hero-cinematic" id="inicio">
+    <div class="promo-backdrop promo-monitor" id="hero-backdrop" aria-hidden="true">
+      <div class="promo-noise"></div>
+      <div class="promo-light promo-light-one"></div>
+      <div class="promo-light promo-light-two"></div>
+      <div class="promo-lines"></div>
+
+      <!-- 3D PERSPECTIVE DASHBOARD -->
+      <div class="promo-dashboard">
+        <div class="promo-dashboard-bar">
+          <span>FLUXGUARD</span>
+          <span>LIVE / 24H</span>
+        </div>
+        <div class="promo-dashboard-main">
+          <div class="promo-metric">
+            <small>ACTIVIDAD</small>
+            <strong id="metric-voltage">127.4 V</strong>
+            <span class="metric-sub">▲ FASE A</span>
+          </div>
+          <div class="promo-metric">
+            <small>ESTADO</small>
+            <strong id="metric-current">8.62 A</strong>
+            <span>MONITOREANDO</span>
+          </div>
+          <div class="promo-metric">
+            <small>POTENCIA</small>
+            <strong id="metric-power">1.09 kW</strong>
+            <span class="metric-sub">ACTIVA</span>
+          </div>
+        </div>
+
+        <div class="promo-chart">
+          <!-- ANIMATED GRAPH SVG REAL DE LA REFERENCIA -->
+          <div class="animated-graph">
+            <div class="graph-glow" aria-hidden="true"></div>
+
+            <svg class="graph-svg" viewBox="0 0 1000 420" preserveAspectRatio="none" aria-hidden="true">
+              <defs>
+                <linearGradient id="fluxGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="#b9a7ff" stopOpacity="0" />
+                  <stop offset="18%" stopColor="#b9a7ff" />
+                  <stop offset="55%" stopColor="#d8ccff" />
+                  <stop offset="78%" stopColor="#ffd56b" />
+                  <stop offset="100%" stopColor="#b9a7ff" stopOpacity="0" />
+                </linearGradient>
+                <linearGradient id="fluxBarGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#c9bbff" stopOpacity="0.28" />
+                  <stop offset="100%" stopColor="#b9a7ff" stopOpacity="0" />
+                </linearGradient>
+              </defs>
+
+              <g class="graph-grid" opacity="0.42">
+                <line x1="83" y1="25" x2="83" y2="350" stroke="rgba(185,167,255,0.1)" />
+                <line x1="166" y1="25" x2="166" y2="350" stroke="rgba(185,167,255,0.1)" />
+                <line x1="249" y1="25" x2="249" y2="350" stroke="rgba(185,167,255,0.1)" />
+                <line x1="332" y1="25" x2="332" y2="350" stroke="rgba(185,167,255,0.1)" />
+                <line x1="415" y1="25" x2="415" y2="350" stroke="rgba(185,167,255,0.1)" />
+                <line x1="498" y1="25" x2="498" y2="350" stroke="rgba(185,167,255,0.1)" />
+                <line x1="581" y1="25" x2="581" y2="350" stroke="rgba(185,167,255,0.1)" />
+                <line x1="664" y1="25" x2="664" y2="350" stroke="rgba(185,167,255,0.1)" />
+                <line x1="747" y1="25" x2="747" y2="350" stroke="rgba(185,167,255,0.1)" />
+                <line x1="830" y1="25" x2="830" y2="350" stroke="rgba(185,167,255,0.1)" />
+                <line x1="0" y1="110" x2="1000" y2="110" stroke="rgba(185,167,255,0.1)" />
+                <line x1="0" y1="165" x2="1000" y2="165" stroke="rgba(185,167,255,0.1)" />
+                <line x1="0" y1="220" x2="1000" y2="220" stroke="rgba(185,167,255,0.1)" />
+                <line x1="0" y1="275" x2="1000" y2="275" stroke="rgba(185,167,255,0.1)" />
+              </g>
+
+              <g class="graph-bars">
+                <rect class="graph-bar" x="92" y="263" width="28" height="52" rx="2" fill="url(#fluxBarGradient)" />
+                <rect class="graph-bar" x="155" y="233" width="28" height="82" rx="2" fill="url(#fluxBarGradient)" />
+                <rect class="graph-bar" x="218" y="253" width="28" height="62" rx="2" fill="url(#fluxBarGradient)" />
+                <rect class="graph-bar" x="281" y="207" width="28" height="108" rx="2" fill="url(#fluxBarGradient)" />
+                <rect class="graph-bar" x="344" y="239" width="28" height="76" rx="2" fill="url(#fluxBarGradient)" />
+                <rect class="graph-bar" x="407" y="193" width="28" height="122" rx="2" fill="url(#fluxBarGradient)" />
+                <rect class="graph-bar" x="470" y="223" width="28" height="92" rx="2" fill="url(#fluxBarGradient)" />
+                <rect class="graph-bar" x="533" y="177" width="28" height="138" rx="2" fill="url(#fluxBarGradient)" />
+              </g>
+
+              <!-- Curva principal -->
+              <path d="M0 300 C80 285 100 325 175 270 S280 145 355 220 S450 335 525 235 S635 95 710 175 S820 275 1000 90"
+                    fill="none" stroke="#b9a7ff" stroke-opacity="0.10" stroke-width="8" stroke-linecap="round" class="graph-main-glow" />
+              <path d="M0 300 C80 285 100 325 175 270 S280 145 355 220 S450 335 525 235 S635 95 710 175 S820 275 1000 90"
+                    fill="none" stroke="url(#fluxGradient)" stroke-width="3.2" stroke-linecap="round" pathLength="1000" class="graph-main-line" />
+              <path d="M0 300 C80 285 100 325 175 270 S280 145 355 220 S450 335 525 235 S635 95 710 175 S820 275 1000 90"
+                    fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="7" stroke-linecap="round" stroke-dasharray="75 925" class="graph-trace" />
+
+              <!-- Trackers de movimiento -->
+              <circle r="6.5" fill="#fff" opacity="0.9" class="graph-tracker">
+                <animateMotion dur="8s" repeatCount="indefinite" path="M0 300 C80 285 100 325 175 270 S280 145 355 220 S450 335 525 235 S635 95 710 175 S820 275 1000 90" rotate="auto" />
+              </circle>
+              <circle r="3" fill="#ffd56b" class="graph-tracker-gold">
+                <animateMotion dur="8s" begin="0.35s" repeatCount="indefinite" path="M0 300 C80 285 100 325 175 270 S280 145 355 220 S450 335 525 235 S635 95 710 175 S820 275 1000 90" rotate="auto" />
+              </circle>
+            </svg>
+
+            <div class="graph-node node-one" aria-hidden="true"></div>
+            <div class="graph-node node-two" aria-hidden="true"></div>
+            <div class="graph-node node-three" aria-hidden="true"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-cinematic-overlay"></div>
+
+    <div class="hero-cinematic-content">
+      <div class="hero-label" id="hero-eyebrow">
+        <span class="status-dot"></span> FLUXGUARD / MONITOREO INTELIGENTE
+      </div>
+
+      <h1 id="hero-title">
+        <span>DATOS QUE SE</span>
+        <span class="accent-line">CONVIERTEN EN</span>
+        <span>DECISIONES.</span>
+      </h1>
+
+      <p class="hero-description" id="hero-desc">
+        Visualiza el comportamiento de tu infraestructura y detecta lo importante antes de que se convierta en un problema.
+      </p>
+
+      <div class="hero-buttons">
+        <a href="#quienes-somos" class="hero-primary">
+          Conocer el proyecto <i class="bi bi-arrow-right"></i>
+        </a>
+        <a href="#como-funciona" class="hero-secondary">
+          Cómo funciona
+        </a>
+      </div>
+    </div>
+
+    <div class="hero-promo-controls">
+      <button type="button" class="promo-play" id="btn-hero-pause" aria-label="Pausar o reanudar">
+        <i class="bi bi-pause-fill"></i>
+      </button>
+      <div class="promo-dots" id="hero-dots-container">
+        <button type="button" class="active hero-dot" aria-label="Slide 1"></button>
+        <button type="button" class="hero-dot" aria-label="Slide 2"></button>
+        <button type="button" class="hero-dot" aria-label="Slide 3"></button>
+      </div>
+      <span class="promo-counter" id="hero-counter">01 / 03</span>
+    </div>
+
+    <div class="hero-scroll">
+      <i class="bi bi-chevron-down"></i>
+      <span>Descubre FluxGuard</span>
+    </div>
+  </section>
+
+  <!-- ================= TICKER ================= -->
+  <div class="flux-ticker" aria-label="FluxGuard highlights">
+    <div class="flux-ticker-track">
+      <span>MONITOREO INTELIGENTE</span><b>✦</b><span>DATOS EN TIEMPO REAL</span><b>✦</b><span>ANÁLISIS</span><b>✦</b><span>ALERTAS</span><b>✦</b><span>INFRAESTRUCTURA</span><b>✦</b><span>MONITOREO INTELIGENTE</span><b>✦</b><span>DATOS EN TIEMPO REAL</span><b>✦</b><span>ANÁLISIS</span><b>✦</b><span>ALERTAS</span><b>✦</b>
+    </div>
+  </div>
+<!-- ================= ¿QUIÉNES SOMOS? ================= -->
+<section id="quienes-somos" class="about-section">
+
+  <div class="about-container">
+
+    <!-- ================= ENCABEZADO ================= -->
+    <div class="about-heading">
+
+      <span class="section-eyebrow">
+        <span></span> ¿QUIÉNES SOMOS?
+      </span>
+
+      <h2>
+        Somos el equipo detrás de
+        <span>FluxGuard.</span>
+      </h2>
+
+    </div>
+
+
+    <!-- ================= CONTENIDO ================= -->
+    <div class="about-layout">
+
+
+      <!-- ================= VISUAL FLUXGUARD ================= -->
+      <div class="about-visual">
+
+        <div class="about-visual-grid"></div>
+
+        <div class="about-glow"></div>
+
+        <div class="data-line line-a"></div>
+        <div class="data-line line-b"></div>
+        <div class="data-line line-c"></div>
+
+
+        <!-- NÚCLEO -->
+        <div class="system-core">
+          <i class="bi bi-activity fs-2"></i>
+        </div>
+
+
+        <!-- NODOS -->
+        <div class="about-node node-a">
+          <span></span>
+        </div>
+
+        <div class="about-node node-b">
+          <span></span>
+        </div>
+
+        <div class="about-node node-c">
+          <span></span>
+        </div>
+
+
+        <!-- ETIQUETA -->
+        <div class="about-label">
+          <span>FLUXGUARD</span>
+          <strong>INTELLIGENT MONITORING</strong>
+        </div>
+
+
+        <!-- NÚMERO -->
+        <div class="about-number">
+          01
+        </div>
+
+
+        <!-- ESQUINA -->
+        <div class="about-corner">
+          <i class="bi bi-arrow-up-right fs-5"></i>
+        </div>
+
+      </div>
+
+
+      <!-- =================================================
+           INFORMACIÓN
+           ================================================= -->
+      <div class="about-content">
+
+
+        <!-- =================================================
+             NUESTRA IDENTIDAD
+             ================================================= -->
+        <div class="identity-box">
+
+          <div class="identity-title">
+
+            <span class="identity-line"></span>
+
+            <span>NUESTRA IDENTIDAD</span>
+
+          </div>
+
+
+          <p class="identity-text">
+            Somos una empresa orientada al desarrollo de soluciones
+            tecnológicas para el monitoreo de infraestructura.
+            <strong>FluxGuard</strong> integra información, análisis y
+            visualización en una experiencia clara y sencilla para apoyar
+            la toma de decisiones.
+          </p>
+
+        </div>
+
+
+
+        <!-- =================================================
+             MISIÓN Y VISIÓN
+             ================================================= -->
+        <div class="mission-vision">
+
+
+          <!-- ================= MISIÓN ================= -->
+          <article class="mv-card">
+
+            <div class="mv-card-header">
+
+              <div class="mv-icon">
+                <i class="bi bi-bullseye"></i>
+              </div>
+
+              <div class="mv-title">
+
+                <span>01</span>
+
+                <h3>MISIÓN</h3>
+
+              </div>
+
+            </div>
+
+
+            <p>
+              En <strong>Fluxguard Corporation</strong> desarrollamos e
+              implementamos soluciones tecnológicas en investigación IoT y
+              analítica predictiva dedicadas al monitoreo y protección de la
+              infraestructura eléctrica crítica corporativa, promoviendo la
+              continuidad operativa, la reducción del riesgo patrimonial y la
+              eficiencia energética mediante el procesamiento inteligente de
+              datos de borde.
+            </p>
+
+          </article>
+
+
+
+          <!-- ================= VISIÓN ================= -->
+          <article class="mv-card">
+
+            <div class="mv-card-header">
+
+              <div class="mv-icon">
+                <i class="bi bi-eye"></i>
+              </div>
+
+              <div class="mv-title">
+
+                <span>02</span>
+
+                <h3>VISIÓN</h3>
+
+              </div>
+
+            </div>
+
+
+            <p>
+              Consolidar a <strong>Fluxguard Corporation</strong> como una
+              iniciativa pionera y referente en Latinoamérica para la
+              investigación, digitalización y desarrollo de tecnología de
+              diagnóstico predictivo en tableros de distribución de baja
+              tensión para el sector inmobiliario corporativo e industrial
+              hacia el año 2030.
+            </p>
+
+          </article>
+
+
+        </div>
+
+      </div>
+
+    </div>
+
+  </div>
+
+</section>
+  <!-- ================= CÓMO FUNCIONA ================= -->
+  <section id="como-funciona" class="how-section">
+    <div class="how-container">
+      <div class="how-heading">
+        <span class="section-eyebrow">
+          <span></span> ¿CÓMO FUNCIONA?
+        </span>
+        <h2>
+          De los datos
+          <span> a la información.</span>
+        </h2>
+        <p>
+          FluxGuard conecta cada etapa del proceso para convertir la información recopilada en una experiencia clara y organizada.
+        </p>
+      </div>
+
+      <div class="how-flow">
+        <div class="flow-line"></div>
+        <div class="flow-line-active"></div>
+
+        <div class="flow-step">
+          <div class="flow-node-wrapper">
+            <div class="flow-node"><i class="bi bi-broadcast-pin fs-4"></i></div>
+            <span class="flow-number">01</span>
+          </div>
+          <div class="flow-content">
+            <h3>Sensores</h3>
+            <p>Los dispositivos recopilan la información necesaria del sistema.</p>
+          </div>
+          <div class="flow-arrow"><i class="bi bi-arrow-right"></i></div>
+        </div>
+
+        <div class="flow-step">
+          <div class="flow-node-wrapper">
+            <div class="flow-node"><i class="bi bi-hdd-network fs-4"></i></div>
+            <span class="flow-number">02</span>
+          </div>
+          <div class="flow-content">
+            <h3>Conexión</h3>
+            <p>La información es transmitida mediante la infraestructura de comunicación.</p>
+          </div>
+          <div class="flow-arrow"><i class="bi bi-arrow-right"></i></div>
+        </div>
+
+        <div class="flow-step">
+          <div class="flow-node-wrapper">
+            <div class="flow-node"><i class="bi bi-cloud-check fs-4"></i></div>
+            <span class="flow-number">03</span>
+          </div>
+          <div class="flow-content">
+            <h3>Nube</h3>
+            <p>Los datos son centralizados para facilitar su almacenamiento y consulta.</p>
+          </div>
+          <div class="flow-arrow"><i class="bi bi-arrow-right"></i></div>
+        </div>
+
+        <div class="flow-step">
+          <div class="flow-node-wrapper">
+            <div class="flow-node"><i class="bi bi-activity fs-4"></i></div>
+            <span class="flow-number">04</span>
+          </div>
+          <div class="flow-content">
+            <h3>FluxGuard</h3>
+            <p>La plataforma organiza y analiza la información para facilitar su interpretación.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="how-bottom">
+        <span></span>
+        <p>Una arquitectura conectada para una visualización más inteligente.</p>
+        <span></span>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= CATÁLOGO DE SERVICIOS ================= -->
+  <section id="servicios" class="services-section">
+    <div class="services-container">
+      <div class="services-heading">
+        <div>
+          <span class="section-eyebrow">
+            <span></span> CATÁLOGO DE SERVICIOS
+          </span>
+          <h2>
+            Soluciones para
+            <span> cada necesidad.</span>
+          </h2>
+        </div>
+        <p>
+          Explora las principales funciones de FluxGuard y el valor que aporta cada una al monitoreo de tu infraestructura.
+        </p>
+      </div>
+
+      <div class="services-grid">
+        <article class="service-card">
+          <div class="service-card-top">
+            <span>01</span>
+            <div class="service-icon"><i class="bi bi-activity fs-5"></i></div>
+          </div>
+          <h3>Monitoreo en tiempo real</h3>
+          <p>Supervisa el comportamiento de tu infraestructura y consulta sus datos de manera clara y continua.</p>
+        </article>
+
+        <article class="service-card">
+          <div class="service-card-top">
+            <span>02</span>
+            <div class="service-icon"><i class="bi bi-bar-chart-line fs-5"></i></div>
+          </div>
+          <h3>Análisis de datos</h3>
+          <p>Convierte los registros recopilados en métricas y tendencias fáciles de interpretar.</p>
+        </article>
+
+        <article class="service-card">
+          <div class="service-card-top">
+            <span>03</span>
+            <div class="service-icon"><i class="bi bi-bell fs-5"></i></div>
+          </div>
+          <h3>Alertas inteligentes</h3>
+          <p>Identifica eventos que requieren atención y recibe información oportuna para actuar.</p>
+        </article>
+
+        <article class="service-card">
+          <div class="service-card-top">
+            <span>04</span>
+            <div class="service-icon"><i class="bi bi-file-earmark-text fs-5"></i></div>
+          </div>
+          <h3>Reportes e historial</h3>
+          <p>Consulta información histórica y utiliza reportes para comparar el comportamiento del sistema.</p>
+        </article>
+
+        <article class="service-card">
+          <div class="service-card-top">
+            <span>05</span>
+            <div class="service-icon"><i class="bi bi-shield-check fs-5"></i></div>
+          </div>
+          <h3>Protección y acceso</h3>
+          <p>Gestiona el acceso a la plataforma con una experiencia orientada a la seguridad.</p>
+        </article>
+
+        <article class="service-card">
+          <div class="service-card-top">
+            <span>06</span>
+            <div class="service-icon"><i class="bi bi-lightning fs-5"></i></div>
+          </div>
+          <h3>Optimización</h3>
+          <p>Utiliza la información obtenida para detectar oportunidades de mejora y tomar decisiones.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= PLATAFORMA (CAROUSEL PREMIUM) ================= -->
+  <section id="plataforma" class="platform-section">
+    <div class="platform-container">
+      <div class="platform-heading">
+        <div>
+          <span class="section-eyebrow"><span></span> PLATAFORMA</span>
+          <h2>Una vista rápida de <span>FluxGuard.</span></h2>
+        </div>
+        <p>Explora cómo la plataforma transforma los datos de tu infraestructura en información útil.</p>
+      </div>
+
+      <div class="platform-carousel" id="platformCarouselWrapper">
+        <div class="carousel-window">
+          <div class="carousel-track" id="platformCarouselTrack" style="transform: translateX(0%);">
+            
+            <!-- Slide 01: MONITOR CON RADAR -->
+            <div class="carousel-slide">
+              <article class="platform-card">
+                <div class="platform-visual monitor">
+                  <div class="visual-header">
+                    <div class="visual-dots"><span></span><span></span><span></span></div>
+                    <small>FLUXGUARD / PLATFORM</small>
+                  </div>
+                  <div class="visual-grid"></div>
+                  <div class="visual-content">
+                    <div class="premium-visual monitor-premium">
+                      <div class="monitor-radar">
+                        <div class="radar-orbit orbit-one"></div>
+                        <div class="radar-orbit orbit-two"></div>
+                        <div class="radar-sweep"></div>
+                        <span class="radar-center"><i class="bi bi-broadcast"></i></span>
+                        <span class="radar-blip blip-one"></span>
+                        <span class="radar-blip blip-two"></span>
+                        <span class="radar-blip blip-three"></span>
+                      </div>
+                      <div class="monitor-kpi-card kpi-main"><small>ESTADO</small><strong>EN LÍNEA</strong><span><i></i> monitoreando</span></div>
+                      <div class="monitor-kpi-card kpi-rate"><i class="bi bi-speedometer2"></i><small>ACTIVIDAD</small><strong>98.4%</strong></div>
+                      <div class="monitor-kpi-card kpi-events"><small>EVENTOS</small><strong>24</strong><span>+08 hoy</span></div>
+                      <div class="monitor-live-line"><i></i> FLUXGUARD LIVE <span>AHORA</span></div>
+                    </div>
+                  </div>
+                  <div class="visual-caption"><i class="bi bi-activity"></i> VISIÓN GENERAL</div>
+                </div>
+                <div class="platform-info">
+                  <div class="platform-number"><span>01</span><i class="bi bi-activity"></i></div>
+                  <div class="platform-info-copy">
+                    <span class="platform-kicker">FLUXGUARD / VISIÓN GENERAL</span>
+                    <h3>Panel principal</h3>
+                    <p>Una lectura inmediata del estado de tu infraestructura, con señales clave visibles de un vistazo.</p>
+                  </div>
+                  <span class="platform-link">Explorar <i class="bi bi-arrow-up-right"></i></span>
+                </div>
+              </article>
+            </div>
+
+            <!-- Slide 02: ANALYTICS -->
+            <div class="carousel-slide">
+              <article class="platform-card">
+                <div class="platform-visual analytics">
+                  <div class="visual-header">
+                    <div class="visual-dots"><span></span><span></span><span></span></div>
+                    <small>FLUXGUARD / PLATFORM</small>
+                  </div>
+                  <div class="visual-grid"></div>
+                  <div class="visual-content">
+                    <div class="premium-visual analytics-premium">
+                      <div class="analytics-top">
+                        <div><small>RENDIMIENTO</small><strong>+12.8%</strong></div>
+                        <span><i class="bi bi-graph-up-arrow"></i> tendencia positiva</span>
+                      </div>
+                      <div class="analytics-chart-shell">
+                        <div class="chart-grid-lines"><i></i><i></i><i></i><i></i></div>
+                        <svg viewBox="0 0 700 300" preserveAspectRatio="none" class="premium-line-chart" aria-hidden="true">
+                          <defs>
+                            <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
+                              <stop offset="0%" stopColor="#cfc4ff" stopOpacity=".30" />
+                              <stop offset="100%" stopColor="#9b7cf4" stopOpacity="0" />
+                            </linearGradient>
+                          </defs>
+                          <path class="chart-area" d="M0 240 C70 215 80 180 145 195 S225 240 285 145 S375 90 430 155 S505 215 555 110 S640 80 700 42 L700 300 L0 300 Z" fill="url(#chartFill)" />
+                          <path class="chart-line" d="M0 240 C70 215 80 180 145 195 S225 240 285 145 S375 90 430 155 S505 215 555 110 S640 80 700 42" />
+                          <circle class="chart-pulse" cx="555" cy="110" r="7" />
+                        </svg>
+                        <div class="chart-labels"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>24:00</span></div>
+                      </div>
+                      <div class="analytics-bottom">
+                        <div><small>MEDICIONES</small><b>1,284</b></div>
+                        <div><small>PRECISIÓN</small><b>99.2%</b></div>
+                        <div class="analytics-ring"><span>87%</span></div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="visual-caption"><i class="bi bi-bar-chart-line"></i> ANÁLISIS</div>
+                </div>
+                <div class="platform-info">
+                  <div class="platform-number"><span>02</span><i class="bi bi-bar-chart-line"></i></div>
+                  <div class="platform-info-copy">
+                    <span class="platform-kicker">FLUXGUARD / ANÁLISIS</span>
+                    <h3>Indicadores</h3>
+                    <p>Convierte cientos de mediciones en tendencias claras para detectar oportunidades antes de que se conviertan en problemas.</p>
+                  </div>
+                  <span class="platform-link">Explorar <i class="bi bi-arrow-up-right"></i></span>
+                </div>
+              </article>
+            </div>
+
+            <!-- Slide 03: ALERTS -->
+            <div class="carousel-slide">
+              <article class="platform-card">
+                <div class="platform-visual alerts">
+                  <div class="visual-header">
+                    <div class="visual-dots"><span></span><span></span><span></span></div>
+                    <small>FLUXGUARD / PLATFORM</small>
+                  </div>
+                  <div class="visual-grid"></div>
+                  <div class="visual-content">
+                    <div class="premium-visual alerts-premium">
+                      <div class="alert-status-bar"><span><i></i> SISTEMA ESTABLE</span><small>3 EVENTOS</small></div>
+                      <div class="alert-main-card">
+                        <div class="alert-icon-wrap"><i class="bi bi-shield-exclamation fs-3"></i></div>
+                        <div><small>PRIORIDAD ALTA</small><strong>Variación detectada</strong><span>Revisión recomendada en sector 04</span></div>
+                        <i class="bi bi-lightning-charge-fill alert-zap"></i>
+                      </div>
+                      <div class="alert-timeline">
+                        <div class="timeline-track"></div>
+                        <div class="timeline-item active"><b>AHORA</b><span>Evento detectado</span></div>
+                        <div class="timeline-item"><b>10:42</b><span>Medición recibida</span></div>
+                        <div class="timeline-item"><b>09:18</b><span>Operación normal</span></div>
+                      </div>
+                      <div class="alert-footer"><span><i></i> RESPUESTA RÁPIDA</span><strong>+94%</strong></div>
+                    </div>
+                  </div>
+                  <div class="visual-caption"><i class="bi bi-bell"></i> ATENCIÓN</div>
+                </div>
+                <div class="platform-info">
+                  <div class="platform-number"><span>03</span><i class="bi bi-bell"></i></div>
+                  <div class="platform-info-copy">
+                    <span class="platform-kicker">FLUXGUARD / ATENCIÓN</span>
+                    <h3>Alertas</h3>
+                    <p>Las señales importantes saltan a la vista para que tu equipo pueda actuar rápido y con contexto.</p>
+                  </div>
+                  <span class="platform-link">Explorar <i class="bi bi-arrow-up-right"></i></span>
+                </div>
+              </article>
+            </div>
+
+            <!-- Slide 04: HISTORY -->
+            <div class="carousel-slide">
+              <article class="platform-card">
+                <div class="platform-visual history">
+                  <div class="visual-header">
+                    <div class="visual-dots"><span></span><span></span><span></span></div>
+                    <small>FLUXGUARD / PLATFORM</small>
+                  </div>
+                  <div class="visual-grid"></div>
+                  <div class="visual-content">
+                    <div class="premium-visual history-premium">
+                      <div class="history-top"><div><small>COMPORTAMIENTO</small><strong>ÚLTIMOS 30 DÍAS</strong></div><i class="bi bi-calendar-week"></i></div>
+                      <div class="heatmap-wrap">
+                        <div class="heatmap-days"><span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
+                        <div class="heatmap">
+                          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                          <i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+                        </div>
+                      </div>
+                      <div class="history-insight"><span><i></i> patrón detectado</span><strong>+18.6%</strong><small>mejora sostenida</small></div>
+                      <div class="history-mini-line"><span></span><span></span><span></span><span></span><span></span><span></span></div>
+                    </div>
+                  </div>
+                  <div class="visual-caption"><i class="bi bi-clock-history"></i> SEGUIMIENTO</div>
+                </div>
+                <div class="platform-info">
+                  <div class="platform-number"><span>04</span><i class="bi bi-clock-history"></i></div>
+                  <div class="platform-info-copy">
+                    <span class="platform-kicker">FLUXGUARD / SEGUIMIENTO</span>
+                    <h3>Historial</h3>
+                    <p>Explora el comportamiento de tu operación en el tiempo y descubre patrones que normalmente pasarían desapercibidos.</p>
+                  </div>
+                  <span class="platform-link">Explorar <i class="bi bi-arrow-up-right"></i></span>
+                </div>
+              </article>
+            </div>
+
+          </div>
+
+          <button class="carousel-arrow carousel-prev" id="btn-platform-prev" aria-label="Anterior"><i class="bi bi-arrow-left fs-5"></i></button>
+          <button class="carousel-arrow carousel-next" id="btn-platform-next" aria-label="Siguiente"><i class="bi bi-arrow-right fs-5"></i></button>
+        </div>
+
+        <div class="carousel-controls">
+          <div class="carousel-dots" id="platform-dots">
+            <button class="active"></button>
+            <button></button>
+            <button></button>
+            <button></button>
+          </div>
+          <span class="carousel-counter" id="platform-counter">01 / 04</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= UBICACIÓN (LEAFLET + OSM REAL) ================= -->
+  <section id="ubicacion" class="location-section">
+    <div class="location-container">
+      <div class="location-heading location-heading-route">
+        <span class="section-eyebrow"><span></span> UBICACIÓN</span>
+        <h2>AQUÍ <span>ESTAMOS.</span></h2>
+        <p>Al entrar, FluxGuard solicitará tu ubicación para calcular y trazar automáticamente el trayecto real hasta nuestras instalaciones.</p>
+      </div>
+
+      <div class="location-route-panel location-route-panel-map">
+        <div class="route-map-wrap route-osm-map">
+          <div id="map" class="flux-leaflet-map" aria-label="Mapa interactivo de OpenStreetMap"></div>
+          <button type="button" class="map-location-control" id="btn-reset-map" aria-label="Centrar mapa">
+            <i class="bi bi-geo-alt"></i>
+          </button>
+          <div class="map-drag-hint">ARRASTRA · RUEDA PARA ZOOM</div>
+          <div class="route-map-badge"><i class="bi bi-geo-alt-fill"></i> OPENSTREETMAP · RUTA</div>
+          <div class="osm-credit-custom">© OpenStreetMap contributors</div>
+        </div>
+
+        <div class="location-info route-info">
+          <div class="location-icon"><i class="bi bi-compass fs-3"></i></div>
+          <span class="location-label">PUNTO DE ENCUENTRO</span>
+          <h3>AQUÍ ESTAMOS</h3>
+          <p>Paseo del Agrarismo 2000, Carr. Mixquiahuala–Tula km 2.5, Mixquiahuala de Juárez, Hidalgo.</p>
+          <div class="route-status"><span class="route-live" id="route-live-indicator"></span><span id="map-route-status">Detectando tu ubicación y calculando la ruta hasta FluxGuard...</span></div>
+          <div class="route-meta">
+            <div><strong id="route-distance-val">—</strong><span>DISTANCIA</span></div>
+            <div><strong id="route-duration-val">—</strong><span>TIEMPO APROX.</span></div>
+          </div>
+          <button type="button" class="location-button route-button" id="btn-map-locate">
+            <i class="bi bi-crosshair"></i> <span id="btn-locate-text">ACTUALIZAR MI UBICACIÓN</span>
+          </button>
+          <a href="https://www.openstreetmap.org/#map=14/20.20488/-99.22093" target="_blank" rel="noreferrer" class="location-button location-button-secondary">
+            VER RUTA EN OPENSTREETMAP
+          </a>
+          <a href="https://www.openstreetmap.org/#map=14/20.20488/-99.22093" target="_blank" rel="noreferrer" class="route-small-link">
+            Explorar mapa <i class="bi bi-arrow-up-right"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= FOOTER ================= -->
+  <footer class="site-footer">
+    <div class="footer-container">
+      <div class="footer-cta">
+        <div>
+          <span class="section-eyebrow"><span></span>FLUXGUARD</span>
+          <h2>Convierte los datos en <span>acción.</span></h2>
+          <p>Una plataforma para visualizar, analizar y entender el comportamiento de tu infraestructura.</p>
+        </div>
+        <a href="#inicio">Volver al inicio <i class="bi bi-arrow-up-right"></i></a>
+      </div>
+
+      <div class="footer-main">
+        <div>
+          <a href="#inicio" class="footer-brand" aria-label="FluxGuard - Inicio">
+            <img src="assets/fluxguard-logo-full.png" class="footer-brand-image" alt="FluxGuard">
+          </a>
+          <p class="footer-description">Monitoreo inteligente, visualización de datos y herramientas para tomar decisiones con mayor claridad.</p>
+        </div>
+        <div>
+          <div class="footer-title">Explora</div>
+          <div class="footer-links">
+            <a href="#quienes-somos">Quiénes somos</a>
+            <a href="#como-funciona">Cómo funciona</a>
+            <a href="#servicios">Servicios</a>
+            <a href="#ubicacion">Ubicación</a>
+          </div>
+        </div>
+        <div class="footer-contact">
+          <div class="footer-title">Contacto</div>
+          <a class="footer-contact-link" href="contacto.html">Solicitar información <i class="bi bi-arrow-up-right"></i></a>
+          <a href="mailto:contacto@fluxguard.io"><i class="bi bi-envelope"></i> contacto@fluxguard.io</a>
+          <div class="footer-status"><i></i> Plataforma disponible</div>
+        </div>
+      </div>
+
+      <div class="footer-bottom">
+        <span>© 2026 FluxGuard. Todos los derechos reservados.</span>
+        <span>IoT · MONITOREO · ANÁLISIS</span>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Botón flotante de WhatsApp -->
+  <a href="https://wa.me/527714368035?text=%C2%A1Hola!%20Bienvenido,%20gracias%20por%20tu%20preferencia.%20%C2%BFEn%20qu%C3%A9%20podemos%20ayudarte%3F"
+     class="whatsapp-float"
+     target="_blank"
+     rel="noopener noreferrer"
+     aria-label="Contactar por WhatsApp">
+    <i class="bi bi-whatsapp"></i>
+  </a>
+
+  <!-- Botón Volver Arriba -->
+  <a href="#inicio" class="back-to-top" id="btn-back-to-top" aria-label="Volver arriba">
+    <i class="bi bi-arrow-up"></i>
+  </a>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
