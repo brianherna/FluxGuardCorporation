@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FluxGuard — Paga Aquí y Activa tu Monitoreo</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,700;1,900&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .checkout-page {
+      min-height: 100vh;
+      background: #0b0815;
+      color: #ffffff;
+      padding-top: 84px;
+      padding-bottom: 70px;
+      position: relative;
+    }
+    .checkout-container {
+      width: min(1160px, calc(100% - 48px));
+      margin: 0 auto;
+    }
+    .checkout-grid {
+      display: grid;
+      grid-template-columns: minmax(320px, 1fr) minmax(380px, 1.1fr);
+      gap: 32px;
+      align-items: start;
+      margin-top: 28px;
+    }
+    .checkout-card {
+      background: rgba(18, 12, 30, 0.95);
+      border: 1px solid rgba(185, 167, 255, 0.22);
+      border-radius: 8px;
+      padding: 32px;
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+    }
+    .plan-badge-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      background: rgba(185, 167, 255, 0.15);
+      border: 1px solid var(--gold);
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      border-radius: 999px;
+    }
+    .checkout-price {
+      font-family: "Barlow Condensed", sans-serif;
+      font-size: 54px;
+      font-weight: 900;
+      color: #ffffff;
+      line-height: 1;
+      margin: 16px 0 8px;
+    }
+    .checkout-price span {
+      font-size: 18px;
+      color: var(--gold);
+      font-weight: 700;
+    }
+    .benefit-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      color: #f1edfa;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .benefit-item i {
+      color: var(--gold);
+      font-size: 16px;
+      margin-top: 2px;
+    }
+    .btn-pay-action {
+      width: 100%;
+      padding: 18px 24px;
+      background: var(--gold);
+      color: #0b0815;
+      font-weight: 900;
+      font-size: 14px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      border: none;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      transition: all 0.25s ease;
+      cursor: pointer;
+      margin-top: 24px;
+    }
+    .btn-pay-action:hover {
+      background: #ffffff;
+      transform: translateY(-2px);
+      box-shadow: 0 10px 30px rgba(185, 167, 255, 0.5);
+    }
+    .user-box {
+      background: #140d24;
+      border: 1px solid rgba(185, 167, 255, 0.3);
+      border-radius: 6px;
+      padding: 20px;
+    }
+    .slogan-banner {
+      background: linear-gradient(135deg, rgba(185, 167, 255, 0.18), rgba(88, 224, 160, 0.08));
+      border: 1px solid var(--gold);
+      border-radius: 6px;
+      padding: 22px;
+    }
+    @media (max-width: 900px) {
+      .checkout-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body class="checkout-page">
+
+  <!-- NAVBAR -->
+  <header class="navbar">
+    <a href="index.html#inicio" class="navbar-logo" aria-label="FluxGuard - Inicio">
+      <img src="assets/fluxguard-logo-full.png" class="navbar-logo-image" alt="FluxGuard">
+    </a>
+
+    <nav class="navbar-links" id="navbarMenu">
+      <a href="index.html#inicio">Inicio</a>
+      <a href="planes.html">Planes</a>
+      <a href="contacto.html">Contacto</a>
+    </nav>
+
+    <div class="navbar-actions">
+      <a href="planes.html" class="btn btn-outline-light btn-sm px-3" style="font-size:11px; font-weight:700;">
+        <i class="bi bi-arrow-left me-1"></i> CAMBIAR PLAN
+      </a>
+    </div>
+  </header>
+
+  <main class="checkout-container">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 pb-3 border-bottom border-secondary border-opacity-25">
+      <div>
+        <span class="section-eyebrow">
+          <span></span> ZONA DE ADQUISICIÓN Y ACTIVACIÓN
+        </span>
+        <h1 class="text-white mt-2 mb-0" style="font-size: clamp(34px, 5vw, 52px); font-weight: 900; letter-spacing: -0.02em;">
+          PAGA AQUÍ
+        </h1>
+        <p class="text-white-50 mt-1 mb-0" style="font-size: 15px;">
+          Confirma la adquisición de tu plan de monitoreo IoT y accede directamente a tu panel de control.
+        </p>
+      </div>
+      <div class="d-flex align-items-center gap-3 text-white-50" style="font-size: 12px; font-weight: 600;">
+        <span class="text-white"><i class="bi bi-shield-check text-warning me-1"></i> Activación Directa</span>
+        <span>•</span>
+        <span class="text-success"><i class="bi bi-check2-circle me-1"></i> Sin formularios de cobro</span>
+      </div>
+    </div>
+
+    <div class="checkout-grid">
+      <!-- COLUMNA IZQUIERDA: RESUMEN DE LA SUSCRIPCIÓN -->
+      <section class="checkout-card">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+          <span class="plan-badge-pill" id="badge-plan">
+            <i class="bi bi-lightning-charge-fill"></i> <span id="plan-name-badge">PLAN STANDARD</span>
+          </span>
+          <span class="text-white-50" style="font-size:11px; font-weight:800;">PASO 02 / 02</span>
+        </div>
+
+        <h3 class="text-white mb-1" id="plan-title" style="font-size:30px; font-weight:800; text-transform:uppercase;">
+          Suscripción Standard
+        </h3>
+        <p class="text-white mb-3" id="plan-desc" style="font-size:14px; color:#e0d8f5 !important;">
+          Monitoreo profesional para oficinas e instalaciones con supervisión continua de circuitos y alertas preventivas.
+        </p>
+
+        <div class="checkout-price">
+          <span id="plan-currency">$</span><span id="plan-price-val">499</span>
+          <span id="plan-period">MXN / MES</span>
+        </div>
+        <small class="d-block text-white-50 mb-4" style="font-size:11px;">* Precio de referencia mensual. Sin cargos sorpresa ni cobros ocultos.</small>
+
+        <h6 class="text-white fw-bold mb-2" style="font-size:12px; letter-spacing:0.1em; text-transform:uppercase;">
+          ¿QUÉ INCLUYE TU SERVICIO?
+        </h6>
+        <div id="plan-benefits-list">
+          <!-- Beneficios renderizados dinámicamente -->
+        </div>
+
+        <div class="mt-4 p-3 rounded" style="background: rgba(185, 167, 255, 0.08); border: 1px dashed rgba(185, 167, 255, 0.3);">
+          <div class="d-flex align-items-center gap-2 text-white" style="font-size:12px; font-weight:600;">
+            <i class="bi bi-patch-check-fill text-warning fs-5"></i>
+            <span>Activación instantánea tras confirmar tu solicitud en esta pantalla.</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- COLUMNA DERECHA: CONFIRMACIÓN Y ESLOGAN PAGA AQUÍ -->
+      <section class="checkout-card">
+        <h4 class="text-white mb-1" style="font-size:24px; font-weight:800; text-transform:uppercase;">
+          Confirmación de Adquisición
+        </h4>
+        <p class="text-white mb-4" style="font-size:13px; color:#e0d8f5 !important;">
+          Haz clic en confirmar para vincular este servicio a tu cuenta e ingresar al Dashboard IoT.
+        </p>
+
+        <!-- BANNER DE ESLOGAN PAGA AQUÍ -->
+        <div class="slogan-banner mb-4">
+          <div class="d-flex align-items-center gap-3 mb-2">
+            <i class="bi bi-shield-fill-check text-warning fs-2"></i>
+            <div>
+              <h5 class="text-white mb-0 fw-bold" style="font-family:'Barlow Condensed', sans-serif; font-size:22px; letter-spacing:0.06em;">
+                PAGA AQUÍ · ZONA DE ADQUISICIÓN
+              </h5>
+              <small class="text-white-50">Acceso preferencial FluxGuard sin captura bancaria.</small>
+            </div>
+          </div>
+          <p class="text-white mb-0 mt-2" style="font-size:13px; line-height:1.5;">
+            Tu perfil ha sido verificado. Solo pulsa el botón de abajo para activar tu monitoreo y acceder a la plataforma de telemetría de forma inmediata.
+          </p>
+        </div>
+
+        <!-- DATOS DEL USUARIO LOGUEADO -->
+        <div class="user-box mb-4">
+          <div class="text-white-50 mb-2" style="font-size:11px; font-weight:800; letter-spacing:0.08em; text-transform:uppercase;">
+            <i class="bi bi-person-fill text-warning me-1"></i> USUARIO REGISTRADO
+          </div>
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+            <div>
+              <div class="text-white fw-bold" id="user-display-name" style="font-size:16px;">Cargando usuario...</div>
+              <div class="text-white-50" id="user-display-email" style="font-size:13px;">correo@ejemplo.com</div>
+            </div>
+            <div>
+              <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-50 py-1 px-2" style="font-size:11px;">
+                <i class="bi bi-check-circle-fill me-1"></i> Sesión Activa
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div id="checkout-alert" class="d-none"></div>
+
+        <button type="button" id="btn-submit-payment" class="btn-pay-action">
+          <span id="btn-pay-text">CONFIRMAR Y ACTIVAR MONITOREO</span>
+          <i class="bi bi-arrow-up-right-circle-fill fs-5"></i>
+        </button>
+
+        <div class="d-flex justify-content-center align-items-center gap-3 mt-4 text-white-50 flex-wrap" style="font-size:11px;">
+          <span><i class="bi bi-check-all text-success"></i> Activación al instante</span>
+          <span>•</span>
+          <span><i class="bi bi-speedometer2 text-info"></i> Acceso a Dashboard</span>
+          <span>•</span>
+          <span><i class="bi bi-headset text-warning"></i> Soporte 24/7</span>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      initCheckoutPage();
+    });
+
+    function initCheckoutPage() {
+      const params = new URLSearchParams(window.location.search);
+      const plan = (params.get("plan") || "standard").toLowerCase();
+
+      // Configuración de los planes
+      const planesConfig = {
+        free: {
+          name: "Plan Free",
+          badge: "PLAN GRATUITO",
+          title: "Suscripción Gratuita",
+          desc: "Monitoreo básico en 1 punto de medición para conocer el comportamiento de tu instalación.",
+          price: "0",
+          subtotal: 0,
+          period: "GRATIS / 1 CIRCUITO",
+          benefits: [
+            "1 circuito o medidor principal",
+            "Voltaje, corriente y potencia en tiempo real",
+            "Dashboard web de monitoreo activo",
+            "Historial de mediciones de hasta 7 días",
+            "Reporte semanal básico en pantalla",
+            "Soporte por documentación comunitaria"
+          ]
+        },
+        standard: {
+          name: "Plan Standard",
+          badge: "PLAN STANDARD (MÁS POPULAR)",
+          title: "Suscripción Standard",
+          desc: "Supervisión profesional para oficinas e instalaciones con alertas preventivas y reportes.",
+          price: "499",
+          subtotal: 499,
+          period: "MXN / MES",
+          benefits: [
+            "Hasta 5 circuitos o zonas de medición en tiempo real",
+            "Monitoreo 24/7 de Voltaje, Corriente y Potencia",
+            "Alertas automáticas por sobrecarga y picos de consumo",
+            "Estimación de costo con tarifa eléctrica configurable",
+            "Exportación de reportes PDF y CSV",
+            "Historial completo de mediciones durante 12 meses",
+            "Acceso inmediato al Dashboard de Usuario IoT"
+          ]
+        },
+        ultimate: {
+          name: "Plan Ultimate",
+          badge: "PLAN CORPORATIVO ULTIMATE",
+          title: "Suscripción Ultimate",
+          desc: "Infraestructura a escala para organizaciones multi-sede con automatizaciones e integraciones API.",
+          price: "1,499",
+          subtotal: 1499,
+          period: "MXN / MES",
+          benefits: [
+            "Circuitos ilimitados y capacidad multi-sede centralizada",
+            "Todo lo incluido en Standard",
+            "Automatizaciones y control de relés según proyecto",
+            "Análisis avanzado de armónicos y factor de potencia",
+            "Reportes ejecutivos de sostenibilidad y eficiencia energética",
+            "Usuarios, roles y permisos de acceso personalizables",
+            "Integración con API / Webhooks y soporte especializado 24/7"
+          ]
+        },
+        prototipo: {
+          name: "Prototipo Piloto",
+          badge: "PROTOTIPO PILOTO FLUXGUARD",
+          title: "Kit Piloto de Demostración",
+          desc: "Primera implementación con hardware IoT para demostración académica y pruebas operativas.",
+          price: "350",
+          subtotal: 350,
+          period: "INVERSIÓN KIT PILOTO",
+          benefits: [
+            "Hardware microcontrolador con sensor de corriente no invasivo",
+            "Conexión WiFi/MQTT preconfigurada al servidor",
+            "Dashboard de monitoreo en vivo activado",
+            "Pruebas de campo y calibración asistida",
+            "Guía paso a paso de instalación y código fuente"
+          ]
+        }
+      };
+
+      const selected = planesConfig[plan] || planesConfig.standard;
+
+      // Actualizar DOM
+      document.getElementById("plan-name-badge").textContent = selected.badge;
+      document.getElementById("plan-title").textContent = selected.title;
+      document.getElementById("plan-desc").textContent = selected.desc;
+      document.getElementById("plan-price-val").textContent = selected.price;
+      if (document.getElementById("plan-period")) {
+        document.getElementById("plan-period").textContent = selected.period;
+      }
+
+      // Render beneficios
+      const benefitsContainer = document.getElementById("plan-benefits-list");
+      benefitsContainer.innerHTML = selected.benefits.map(b => `
+        <div class="benefit-item">
+          <i class="bi bi-check-circle-fill"></i>
+          <span>${b}</span>
+        </div>
+      `).join("");
+
+      // Requerir sesión previa o redirigir
+      const rawUser = localStorage.getItem("usuario");
+      if (!rawUser) {
+        window.location.href = `login.html?solicitar=plan&plan=${plan}&redirect=${encodeURIComponent(window.location.href)}`;
+        return;
+      }
+
+      let userObj = {};
+      try {
+        userObj = JSON.parse(rawUser);
+        const fullName = `${userObj.nombre || "Usuario"} ${userObj.apellido || ""}`.trim();
+        document.getElementById("user-display-name").textContent = fullName;
+        document.getElementById("user-display-email").textContent = userObj.correo || "";
+      } catch (_) {
+        window.location.href = `login.html?solicitar=plan&plan=${plan}&redirect=${encodeURIComponent(window.location.href)}`;
+        return;
+      }
+
+      // Acción de activación
+      const alertBox = document.getElementById("checkout-alert");
+      const payButton = document.getElementById("btn-submit-payment");
+
+      payButton.addEventListener("click", () => {
+        payButton.disabled = true;
+        payButton.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> ACTIVANDO TU MONITOREO...`;
+
+        setTimeout(() => {
+          userObj.suscripcion = {
+            plan: selected.name,
+            tipo: plan,
+            precio: selected.price,
+            estado: "Activa",
+            circuitos: plan === "free" ? 1 : (plan === "ultimate" ? 12 : 5),
+            fechaInicio: new Date().toLocaleDateString("es-MX"),
+            proximoCobro: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("es-MX"),
+            transaccionId: "FLX-" + Math.floor(100000 + Math.random() * 900000)
+          };
+          localStorage.setItem("usuario", JSON.stringify(userObj));
+
+          showAlert(alertBox, "success", "<strong>¡Servicio activado con éxito!</strong> Tu plan de monitoreo ha quedado vinculado a tu cuenta. Redirigiendo a tu Dashboard de Monitoreo...");
+
+          setTimeout(() => {
+            window.location.href = "dashboard.html";
+          }, 1200);
+        }, 1200);
+      });
+    }
+
+    function showAlert(container, type, message) {
+      if (!container) return;
+      container.className = `alert alert-${type} py-2 px-3 mb-3 border-0`;
+      container.style.fontSize = "13px";
+      container.innerHTML = `<i class="bi ${type === "success" ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill"} me-2"></i>${message}`;
+      container.classList.remove("d-none");
+    }
+  </script>
+</body>
+</html>
