@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FluxGuard — Panel de Control y Monitoreo IoT</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,700;1,900&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+  <style>
+    .dashboard-page {
+      min-height: 100vh;
+      background: #0b0815;
+      color: #ffffff;
+      padding-top: 84px;
+      padding-bottom: 80px;
+    }
+    .dash-container {
+      width: min(1240px, calc(100% - 48px));
+      margin: 0 auto;
+    }
+    .dash-card {
+      background: rgba(18, 12, 30, 0.96);
+      border: 1px solid rgba(185, 167, 255, 0.22);
+      border-radius: 8px;
+      padding: 24px;
+      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.5);
+      position: relative;
+    }
+    .metric-card {
+      background: rgba(22, 14, 38, 0.95);
+      border: 1px solid rgba(185, 167, 255, 0.18);
+      border-radius: 6px;
+      padding: 20px;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .metric-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--gold);
+    }
+    .metric-val {
+      font-family: "Barlow Condensed", sans-serif;
+      font-size: 38px;
+      font-weight: 900;
+      color: #ffffff;
+      line-height: 1;
+      margin: 10px 0 4px;
+    }
+    .metric-label {
+      font-size: 11px;
+      font-weight: 800;
+      color: #d6c7ff;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    .circuit-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding: 14px 18px;
+      background: rgba(25, 17, 44, 0.6);
+      border: 1px solid rgba(185, 167, 255, 0.15);
+      border-radius: 6px;
+      margin-bottom: 10px;
+      transition: background 0.2s;
+    }
+    .circuit-row:hover {
+      background: rgba(35, 23, 62, 0.8);
+      border-color: rgba(185, 167, 255, 0.35);
+    }
+    .badge-status-live {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 12px;
+      background: rgba(82, 164, 71, 0.2);
+      border: 1px solid #52a447;
+      color: #79f56a;
+      font-size: 11px;
+      font-weight: 800;
+      border-radius: 999px;
+      letter-spacing: 0.08em;
+    }
+    .status-pulse-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #79f56a;
+      box-shadow: 0 0 10px #79f56a;
+      animation: statusBlink 1.8s infinite;
+    }
+    @keyframes statusBlink {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(0.8); }
+    }
+    .btn-action-dash {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 18px;
+      background: rgba(185, 167, 255, 0.15);
+      border: 1px solid var(--gold);
+      color: #ffffff;
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .btn-action-dash:hover {
+      background: var(--gold);
+      color: #0b0815;
+      transform: translateY(-1px);
+    }
+  </style>
+</head>
+<body class="dashboard-page">
+
+  <!-- NAVBAR -->
+  <header class="navbar">
+    <a href="index.html#inicio" class="navbar-logo" aria-label="FluxGuard - Inicio">
+      <img src="assets/fluxguard-logo-full.png" class="navbar-logo-image" alt="FluxGuard">
+    </a>
+
+    <nav class="navbar-links" id="navbarMenu">
+      <a href="index.html#inicio">Inicio</a>
+      <a href="planes.html">Planes</a>
+      <a href="contacto.html">Contacto</a>
+      <a href="dashboard.html" style="color:var(--gold) !important; font-weight:900;">Dashboard</a>
+    </nav>
+
+    <div class="navbar-actions">
+      <div class="dropdown">
+        <button class="btn-flux-outline dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" id="user-display-name">
+          <i class="bi bi-person-circle"></i> <span id="user-greeting-btn">Usuario</span>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
+          <li><h6 class="dropdown-header text-truncate" id="user-email-header" style="max-width:220px;">usuario@fluxguard.io</h6></li>
+          <li><span class="dropdown-item-text text-warning small fw-bold" id="dropdown-plan-badge"><i class="bi bi-stars me-1"></i> Plan Standard</span></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item" href="planes.html"><i class="bi bi-grid me-2"></i>Cambiar Suscripción</a></li>
+          <li><a class="dropdown-item" href="contacto.html"><i class="bi bi-headset me-2"></i>Soporte Técnico</a></li>
+          <li><hr class="dropdown-divider"></li>
+          <li><button class="dropdown-item text-danger" id="btn-dash-logout"><i class="bi bi-box-arrow-right me-2"></i>Cerrar sesión</button></li>
+        </ul>
+      </div>
+    </div>
+  </header>
+
+  <main class="dash-container">
+    <!-- CABECERA PRINCIPAL CON DATOS DE LA SUSCRIPCIÓN -->
+    <div class="dash-card mb-4" style="background: linear-gradient(135deg, rgba(28, 18, 48, 0.98), rgba(13, 8, 24, 0.98)); border-color: rgba(185, 167, 255, 0.35);">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <div>
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <span class="badge-status-live">
+              <span class="status-pulse-dot"></span> <span id="dash-status-badge">SUSCRIPCIÓN ACTIVA & EN LÍNEA</span>
+            </span>
+            <span class="badge bg-dark border border-secondary text-white" id="dash-plan-chip">
+              PLAN STANDARD ($499 MXN / MES)
+            </span>
+          </div>
+          <h1 class="text-white mb-1" style="font-size: clamp(28px, 4vw, 42px); font-weight: 900;">
+            PANEL DE MONITOREO IOT — <span id="dash-owner-name">CLIENTE</span>
+          </h1>
+          <p class="text-white mb-0" style="font-size:14px; color:#e0d8f5 !important;">
+            Supervisión continua de infraestructura eléctrica. Lecturas sincronizadas en tiempo real.
+          </p>
+        </div>
+
+        <div class="d-flex gap-2 flex-wrap">
+          <button class="btn-action-dash" id="btn-download-pdf">
+            <i class="bi bi-file-earmark-pdf-fill text-danger"></i> Descargar Reporte (PDF)
+          </button>
+          <button class="btn-action-dash" id="btn-export-csv">
+            <i class="bi bi-file-earmark-spreadsheet-fill text-success"></i> Exportar Datos (CSV)
+          </button>
+          <a href="planes.html" class="btn btn-outline-secondary btn-sm d-inline-flex align-items-center gap-1 text-white" style="font-size:11px; font-weight:700; padding:10px 14px;">
+            <i class="bi bi-gear-fill"></i> Administrar Plan
+          </a>
+        </div>
+      </div>
+
+      <!-- Resumen de Contrato de la Suscripción -->
+      <div class="row g-3 mt-3 pt-3 border-top border-secondary border-opacity-25 text-white" style="font-size: 13px;">
+        <div class="col-6 col-md-3">
+          <span class="text-white-50 d-block mb-1" style="font-size: 11px; text-transform: uppercase;">Capacidad Asignada:</span>
+          <strong class="text-white fs-6" id="dash-circuits-count"><i class="bi bi-diagram-3-fill text-warning me-1"></i> 5 Circuitos Habilitados</strong>
+        </div>
+        <div class="col-6 col-md-3">
+          <span class="text-white-50 d-block mb-1" style="font-size: 11px; text-transform: uppercase;">Facturación:</span>
+          <strong class="text-white fs-6" id="dash-period-info"><i class="bi bi-calendar-check-fill text-info me-1"></i> Renovación: 13/10/2026</strong>
+        </div>
+        <div class="col-6 col-md-3">
+          <span class="text-white-50 d-block mb-1" style="font-size: 11px; text-transform: uppercase;">ID Transacción / Folio:</span>
+          <strong class="text-white fs-6 font-monospace" id="dash-trans-id"><i class="bi bi-receipt text-success me-1"></i> FLX-849201</strong>
+        </div>
+        <div class="col-6 col-md-3">
+          <span class="text-white-50 d-block mb-1" style="font-size: 11px; text-transform: uppercase;">Disponibilidad de Red:</span>
+          <strong class="text-success fs-6"><i class="bi bi-broadcast me-1"></i> 99.98% Operando</strong>
+        </div>
+      </div>
+    </div>
+
+    <!-- TARJETAS DE SENSORES IOT EN TIEMPO REAL -->
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-lg-3">
+        <div class="metric-card">
+          <div class="d-flex justify-content-between">
+            <span class="metric-label">VOLTAJE RMS</span>
+            <i class="bi bi-lightning-charge-fill text-warning"></i>
+          </div>
+          <div class="metric-val" id="dash-val-v">127.4 V</div>
+          <div class="d-flex justify-content-between align-items-center text-white-50" style="font-size: 11px;">
+            <span>Rango óptimo (CFE)</span>
+            <span class="text-success fw-bold">120 - 130 V</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-6 col-lg-3">
+        <div class="metric-card">
+          <div class="d-flex justify-content-between">
+            <span class="metric-label">CORRIENTE TOTAL</span>
+            <i class="bi bi-activity text-info"></i>
+          </div>
+          <div class="metric-val" id="dash-val-a">8.45 A</div>
+          <div class="d-flex justify-content-between align-items-center text-white-50" style="font-size: 11px;">
+            <span>Límite seguro</span>
+            <span class="text-white fw-bold">Máx. 25.0 A</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-6 col-lg-3">
+        <div class="metric-card">
+          <div class="d-flex justify-content-between">
+            <span class="metric-label">POTENCIA ACTIVA</span>
+            <i class="bi bi-speedometer2 text-primary" style="color:var(--gold) !important;"></i>
+          </div>
+          <div class="metric-val" id="dash-val-w">1.08 kW</div>
+          <div class="d-flex justify-content-between align-items-center text-white-50" style="font-size: 11px;">
+            <span>Factor de Potencia</span>
+            <span class="text-success fw-bold">FP 0.98</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-6 col-lg-3">
+        <div class="metric-card">
+          <div class="d-flex justify-content-between">
+            <span class="metric-label">FRECUENCIA</span>
+            <i class="bi bi-soundwave text-danger"></i>
+          </div>
+          <div class="metric-val" id="dash-val-hz">60.0 Hz</div>
+          <div class="d-flex justify-content-between align-items-center text-white-50" style="font-size: 11px;">
+            <span>Estabilidad de Red</span>
+            <span class="text-success fw-bold">Sincronizado</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECCIÓN INTERMEDIA: GRÁFICO EN VIVO & CONSUMO -->
+    <div class="row g-4 mb-4">
+      <div class="col-lg-8">
+        <div class="dash-card h-100">
+          <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+              <h4 class="text-white mb-0" style="font-size: 20px; font-weight: 800; text-transform: uppercase;">
+                Curva de Energía y Monitoreo de Armónicos
+              </h4>
+              <small class="text-white-50">Trazado continuo en tiempo real desde nodos IoT instalados.</small>
+            </div>
+            <span class="badge bg-secondary border border-light border-opacity-25">Muestreo: 1 Hz</span>
+          </div>
+
+          <!-- SVG ANIMADO CON GRÁFICA EN VIVO -->
+          <div class="position-relative p-2 rounded" style="background:#11091e; border:1px solid rgba(185,167,255,0.15); height: 260px; overflow:hidden;">
+            <svg viewBox="0 0 700 240" style="width:100%; height:100%;">
+              <defs>
+                <linearGradient id="dashGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stop-color="#b9a7ff" stop-opacity="0.45"/>
+                  <stop offset="100%" stop-color="#b9a7ff" stop-opacity="0.0"/>
+                </linearGradient>
+              </defs>
+              <!-- Cuadrícula -->
+              <line x1="0" y1="40" x2="700" y2="40" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4"/>
+              <line x1="0" y1="90" x2="700" y2="90" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4"/>
+              <line x1="0" y1="140" x2="700" y2="140" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4"/>
+              <line x1="0" y1="190" x2="700" y2="190" stroke="rgba(255,255,255,0.06)" stroke-dasharray="4"/>
+
+              <!-- Curva y Área -->
+              <path d="M0,170 Q70,90 140,140 T280,100 T420,130 T560,70 T700,110 L700,240 L0,240 Z" fill="url(#dashGrad)" />
+              <path d="M0,170 Q70,90 140,140 T280,100 T420,130 T560,70 T700,110" fill="none" stroke="#b9a7ff" stroke-width="3.5" />
+
+              <!-- Puntos de medición interactivos -->
+              <circle cx="140" cy="140" r="5" fill="#ffffff" stroke="#b9a7ff" stroke-width="3" />
+              <circle cx="280" cy="100" r="5" fill="#ffffff" stroke="#b9a7ff" stroke-width="3" />
+              <circle cx="420" cy="130" r="5" fill="#ffffff" stroke="#b9a7ff" stroke-width="3" />
+              <circle cx="560" cy="70" r="5" fill="#ffffff" stroke="#b9a7ff" stroke-width="3" />
+            </svg>
+            <div class="d-flex justify-content-between text-white-50 px-3 mt-1" style="font-size:10px; font-weight:700;">
+              <span>08:00 AM</span>
+              <span>10:00 AM</span>
+              <span>12:00 PM</span>
+              <span>02:00 PM</span>
+              <span>04:00 PM</span>
+              <span>AHORA EN VIVO</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Resumen de Costos y Eficiencia -->
+      <div class="col-lg-4">
+        <div class="dash-card h-100">
+          <h4 class="text-white mb-1" style="font-size: 20px; font-weight: 800; text-transform: uppercase;">
+            Estimación Tarifaria CFE
+          </h4>
+          <p class="text-white-50 mb-3" style="font-size: 13px;">Cálculo automático de acuerdo con tu tarifa registrada.</p>
+
+          <div class="p-3 rounded mb-3" style="background:#150d27; border:1px solid rgba(185,167,255,0.18);">
+            <div class="d-flex justify-content-between text-white mb-1" style="font-size:13px;">
+              <span>Consumo Acumulado Hoy:</span>
+              <strong class="text-white">14.28 kWh</strong>
+            </div>
+            <div class="d-flex justify-content-between text-white mb-2" style="font-size:13px;">
+              <span>Costo Estimado Hoy:</span>
+              <strong class="text-warning">$31.42 MXN</strong>
+            </div>
+            <div class="progress" style="height: 6px; background: rgba(255,255,255,0.1);">
+              <div class="progress-bar bg-warning" role="progressbar" style="width: 38%;" aria-valuenow="38" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <small class="text-white-50 d-block mt-2" style="font-size:11px;">38% del límite de consumo recomendado mensual alcanzado.</small>
+          </div>
+
+          <div class="alert alert-dark border-0 p-3 mb-0" style="background:rgba(82, 164, 71, 0.1); border-left: 3px solid #52a447 !important;">
+            <div class="d-flex gap-2">
+              <i class="bi bi-shield-check text-success fs-5"></i>
+              <div>
+                <strong class="text-white d-block" style="font-size:13px;">Diagnóstico de Red: Normal</strong>
+                <span class="text-white-50" style="font-size:12px;">No se detectaron transitorios, armónicos peligrosos ni caídas de tensión en los últimos 7 días.</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LISTADO DE LOS CIRCUITOS CONTRATADOS -->
+    <div class="dash-card">
+      <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+        <div>
+          <h4 class="text-white mb-0" style="font-size: 22px; font-weight: 800; text-transform: uppercase;">
+            Supervisión de Circuitos Instalados
+          </h4>
+          <small class="text-white-50">Visualización individual por cada sensor asignado a tu suscripción.</small>
+        </div>
+        <span class="badge bg-dark border border-secondary text-white" id="badge-circuit-slots">
+          5 / 5 Circuitos Asignados
+        </span>
+      </div>
+
+      <div id="circuits-container">
+        <!-- CIRCUITO 1 -->
+        <div class="circuit-row">
+          <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle p-2" style="background: rgba(185, 167, 255, 0.15); color: var(--gold);">
+              <i class="bi bi-lightning-fill fs-5"></i>
+            </div>
+            <div>
+              <strong class="text-white d-block" style="font-size: 15px;">Circuito #1 — Subestación & Acometida Principal</strong>
+              <small class="text-white-50">Sensor no invasivo SCT-013 · Medición Primaria</small>
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-4 text-white" style="font-size: 13px;">
+            <div><span class="text-white-50 d-block" style="font-size:10px;">VOLTAJE</span> <strong id="c1-v">127.4 V</strong></div>
+            <div><span class="text-white-50 d-block" style="font-size:10px;">CORRIENTE</span> <strong id="c1-a">3.20 A</strong></div>
+            <div><span class="text-white-50 d-block" style="font-size:10px;">ESTADO</span> <span class="badge bg-success bg-opacity-25 text-success">OPERANDO</span></div>
+          </div>
+        </div>
+
+        <!-- CIRCUITO 2 -->
+        <div class="circuit-row">
+          <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle p-2" style="background: rgba(185, 167, 255, 0.15); color: var(--gold);">
+              <i class="bi bi-gear-wide-connected fs-5"></i>
+            </div>
+            <div>
+              <strong class="text-white d-block" style="font-size: 15px;">Circuito #2 — Taller de Maquinaria & Motores</strong>
+              <small class="text-white-50">Cargas inductivas pesadas · Supervisión de pico</small>
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-4 text-white" style="font-size: 13px;">
+            <div><span class="text-white-50 d-block" style="font-size:10px;">VOLTAJE</span> <strong id="c2-v">126.8 V</strong></div>
+            <div><span class="text-white-50 d-block" style="font-size:10px;">CORRIENTE</span> <strong id="c2-a">2.65 A</strong></div>
+            <div><span class="text-white-50 d-block" style="font-size:10px;">ESTADO</span> <span class="badge bg-success bg-opacity-25 text-success">OPERANDO</span></div>
+          </div>
+        </div>
+
+        <!-- CIRCUITO 3 -->
+        <div class="circuit-row">
+          <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle p-2" style="background: rgba(185, 167, 255, 0.15); color: var(--gold);">
+              <i class="bi bi-building fs-5"></i>
+            </div>
+            <div>
+              <strong class="text-white d-block" style="font-size: 15px;">Circuito #3 — Oficinas Administrativas & Climatización</strong>
+              <small class="text-white-50">Sistemas HVAC, cómputo y tomas de fuerza</small>
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-4 text-white" style="font-size: 13px;">
+            <div><span class="text-white-50 d-block" style="font-size:10px;">VOLTAJE</span> <strong id="c3-v">127.1 V</strong></div>
+            <div><span class="text-white-50 d-block" style="font-size:10px;">CORRIENTE</span> <strong id="c3-a">1.50 A</strong></div>
+            <div><span class="text-white-50 d-block" style="font-size:10px;">ESTADO</span> <span class="badge bg-success bg-opacity-25 text-success">OPERANDO</span></div>
+          </div>
+        </div>
+
+        <!-- CIRCUITO 4 -->
+        <div class="circuit-row">
+          <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle p-2" style="background: rgba(185, 167, 255, 0.15); color: var(--gold);">
+              <i class="bi bi-hdd-network fs-5"></i>
+            </div>
+            <div>
+              <strong class="text-white d-block" style="font-size: 15px;">Circuito #4 — Servidores, SITE Telecom & Cámaras</strong>
+              <small class="text-white-50">Circuito crítico protegido con respaldo UPS</small>
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-4 text-white" style="font-size: 13px;">
+            <div><span class="text-white-50 d-block" style="font-size:10px;">VOLTAJE</span> <strong id="c4-v">128.0 V</strong></div>
+            <div><span class="text-white-50 d-block" style="font-size:10px;">CORRIENTE</span> <strong id="c4-a">0.85 A</strong></div>
+            <div><span class="text-white-50 d-block" style="font-size:10px;">ESTADO</span> <span class="badge bg-success bg-opacity-25 text-success">OPERANDO</span></div>
+          </div>
+        </div>
+
+        <!-- CIRCUITO 5 -->
+        <div class="circuit-row">
+          <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle p-2" style="background: rgba(185, 167, 255, 0.15); color: var(--gold);">
+              <i class="bi bi-lightbulb fs-5"></i>
+            </div>
+            <div>
+              <strong class="text-white d-block" style="font-size: 15px;">Circuito #5 — Iluminación Perimetral & Seguridad</strong>
+              <small class="text-white-50">Luminarias LED con sensor crepuscular</small>
+            </div>
+          </div>
+          <div class="d-flex align-items-center gap-4 text-white" style="font-size: 13px;">
+            <div><span class="text-white-50 d-block" style="font-size:10px;">VOLTAJE</span> <strong id="c5-v">127.2 V</strong></div>
+            <div><span class="text-white-50 d-block" style="font-size:10px;">CORRIENTE</span> <strong id="c5-a">0.25 A</strong></div>
+            <div><span class="text-white-50 d-block" style="font-size:10px;">ESTADO</span> <span class="badge bg-success bg-opacity-25 text-success">OPERANDO</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      // 1. Proteger acceso: requerir sesión iniciada
+      const rawUser = localStorage.getItem("usuario");
+      if (!rawUser) {
+        window.location.href = "login.html?redirect=dashboard.html";
+        return;
+      }
+
+      let user = {};
+      try {
+        user = JSON.parse(rawUser);
+      } catch (_) {
+        localStorage.removeItem("usuario");
+        window.location.href = "login.html";
+        return;
+      }
+
+      if (!user || !user.correo) {
+        localStorage.removeItem("usuario");
+        window.location.href = "login.html?redirect=dashboard.html";
+        return;
+      }
+
+      // Si el usuario no tiene suscripción activa, enviarlo a elegir plan
+      if (!user.suscripcion) {
+        window.location.href = "planes.html";
+        return;
+      }
+
+      // Nombre y correo en DOM
+      const nombreCompleto = `${user.nombre || "Usuario"} ${user.apellido || ""}`.trim();
+      document.getElementById("dash-owner-name").textContent = nombreCompleto.toUpperCase();
+      document.getElementById("user-greeting-btn").textContent = user.nombre || "Usuario";
+      document.getElementById("user-email-header").textContent = user.correo;
+
+      const sub = user.suscripcion;
+
+      document.getElementById("dash-plan-chip").textContent = `${sub.plan.toUpperCase()} · ESTADO: ${sub.estado.toUpperCase()}`;
+      document.getElementById("dropdown-plan-badge").innerHTML = `<i class="bi bi-stars me-1"></i> ${sub.plan}`;
+      document.getElementById("dash-circuits-count").innerHTML = `<i class="bi bi-diagram-3-fill text-warning me-1"></i> ${sub.circuitos} Circuitos Habilitados`;
+      document.getElementById("badge-circuit-slots").textContent = `${sub.circuitos} / ${sub.circuitos} Circuitos Asignados`;
+      document.getElementById("dash-period-info").innerHTML = `<i class="bi bi-calendar-check-fill text-info me-1"></i> Renovación: ${sub.proximoCobro || "Próximo mes"}`;
+      document.getElementById("dash-trans-id").innerHTML = `<i class="bi bi-receipt text-success me-1"></i> ${sub.transaccionId || "FLX-849201"}`;
+
+      // Logout
+      document.getElementById("btn-dash-logout")?.addEventListener("click", () => {
+        localStorage.removeItem("usuario");
+        window.location.href = "index.html";
+      });
+
+      // Simulación en tiempo real de métricas
+      setInterval(() => {
+        const v = (127.0 + Math.random() * 1.2 - 0.6).toFixed(1);
+        const a = (8.4 + Math.random() * 0.3 - 0.15).toFixed(2);
+        const w = ((v * a) / 1000).toFixed(2);
+        const hz = (60.0 + (Math.random() * 0.08 - 0.04)).toFixed(1);
+
+        document.getElementById("dash-val-v").textContent = v + " V";
+        document.getElementById("dash-val-a").textContent = a + " A";
+        document.getElementById("dash-val-w").textContent = w + " kW";
+        document.getElementById("dash-val-hz").textContent = hz + " Hz";
+
+        // Variaciones leves en circuitos individuales
+        if (document.getElementById("c1-v")) document.getElementById("c1-v").textContent = v + " V";
+        if (document.getElementById("c1-a")) document.getElementById("c1-a").textContent = (3.15 + Math.random() * 0.1).toFixed(2) + " A";
+        if (document.getElementById("c2-a")) document.getElementById("c2-a").textContent = (2.60 + Math.random() * 0.1).toFixed(2) + " A";
+      }, 2500);
+
+      // Descargar CSV
+      document.getElementById("btn-export-csv")?.addEventListener("click", () => {
+        const csvContent = "data:text/csv;charset=utf-8," 
+          + "Fecha_Hora,Circuito,Voltaje_RMS_V,Corriente_A,Potencia_kW,Frecuencia_Hz,Estado\n"
+          + `${new Date().toISOString()},Subestacion_Principal,127.4,3.20,0.41,60.0,NORMAL\n`
+          + `${new Date().toISOString()},Taller_Maquinaria,126.8,2.65,0.34,60.0,NORMAL\n`
+          + `${new Date().toISOString()},Oficinas_HVAC,127.1,1.50,0.19,60.0,NORMAL\n`
+          + `${new Date().toISOString()},SITE_Telecom,128.0,0.85,0.11,60.0,NORMAL\n`
+          + `${new Date().toISOString()},Iluminacion_Perimetral,127.2,0.25,0.03,60.0,NORMAL\n`;
+        
+        const encodedUri = encodeURI(csvContent);
+        const link = document.createElement("a");
+        link.setAttribute("href", encodedUri);
+        link.setAttribute("download", `fluxguard_telemetria_${sub.tipo || "standard"}.csv`);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      });
+
+      // Descargar PDF (Alerta / Simulación)
+      document.getElementById("btn-download-pdf")?.addEventListener("click", () => {
+        alert("Generando Reporte Mensual Certificado en PDF...\n\nPlan: " + sub.plan + "\nTitular: " + nombreCompleto + "\nFolio: " + (sub.transaccionId || "FLX-849201") + "\n\nEl documento PDF con sello digital de FluxGuard se ha generado con éxito.");
+      });
+    });
+  </script>
+</body>
+</html>
