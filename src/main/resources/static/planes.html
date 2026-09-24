@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FluxGuard — Planes y Servicios</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,700;1,900&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="plans-page">
+
+  <!-- ================= NAVBAR ================= -->
+  <header class="navbar">
+    <a href="index.html#inicio" class="navbar-logo" aria-label="FluxGuard - Inicio">
+      <img src="assets/fluxguard-logo-full.png" class="navbar-logo-image" alt="FluxGuard">
+    </a>
+
+    <nav class="navbar-links" id="navbarMenu">
+      <a href="index.html#inicio">Inicio</a>
+      <a href="index.html#quienes-somos">Equipo</a>
+      <a href="index.html#como-funciona">Cómo funciona</a>
+      <a href="index.html#servicios">Servicios</a>
+      <a href="index.html#tecnologia">Tecnología</a>
+      <a href="index.html#plataforma">Plataforma</a>
+      <a href="index.html#ubicacion">Ubicación</a>
+      <a href="planes.html" style="color:#fff;">Planes</a>
+      <a href="contacto.html">Contacto</a>
+    </nav>
+
+    <div class="navbar-actions" id="navbar-auth-action">
+      <a href="login.html" class="navbar-panel">
+        Iniciar sesión <i class="bi bi-arrow-up-right"></i>
+      </a>
+    </div>
+
+    <button type="button" class="navbar-mobile-toggle" id="navbarToggle" aria-label="Abrir menú">
+      <i class="bi bi-list fs-4"></i>
+    </button>
+  </header>
+
+  <div class="plans-background"></div>
+  <div class="plans-grid-noise"></div>
+
+  <a href="index.html" class="plans-back">
+    <i class="bi bi-arrow-left"></i> VOLVER AL INICIO
+  </a>
+
+  <div class="plans-index">FLUXGUARD / 02 — SERVICIOS</div>
+
+  <!-- HERO PLANES -->
+  <header class="plans-hero">
+    <div>
+      <a href="index.html" class="plans-brand" aria-label="FluxGuard - Inicio">
+        <img src="assets/fluxguard-logo-full.png" alt="FluxGuard">
+      </a>
+
+      <span class="section-eyebrow">
+        <span></span> FLUXGUARD / SOLUCIONES
+      </span>
+
+      <h1>
+        Consigue<br>
+        <em>FluxGuard.</em>
+      </h1>
+      <p>
+        Descubre una solución de monitoreo pensada para crecer contigo.
+        Comienza con un prototipo, valida el valor y escala FluxGuard
+        cuando tu instalación necesite más cobertura, datos y control.
+      </p>
+    </div>
+  </header>
+
+  <!-- OFERTA DE PROTOTIPO -->
+  <section class="prototype-offer">
+    <div class="prototype-copy">
+      <span class="plans-kicker">00 / PROTOTIPO</span>
+      <h2>
+        Consigue tu<br>
+        <em>producto.</em>
+      </h2>
+      <p>
+        Una primera implementación de FluxGuard para validar el monitoreo
+        en tu entorno. Ideal para demostraciones, pruebas académicas y una
+        instalación piloto antes de escalar.
+      </p>
+      <a href="pago.html?plan=prototipo" id="btn-solicitar-prototipo" class="plans-primary-button">
+        SOLICITAR PROTOTIPO <i class="bi bi-arrow-up-right"></i>
+      </a>
+    </div>
+
+    <div class="prototype-card">
+      <div class="prototype-card-top">
+        <span>FLUXGUARD / PILOTO</span>
+        <span>READY TO TEST</span>
+      </div>
+      <div class="prototype-visual">
+        <div class="prototype-orbit orbit-one"></div>
+        <div class="prototype-orbit orbit-two"></div>
+        <div class="prototype-core">
+          <i class="bi bi-cpu fs-2 text-primary" style="color:var(--gold) !important;"></i>
+        </div>
+        <div class="prototype-signal signal-one"><span>V</span><b>127.4</b></div>
+        <div class="prototype-signal signal-two"><span>A</span><b>8.62</b></div>
+        <div class="prototype-signal signal-three"><span>W</span><b>1.09K</b></div>
+      </div>
+      <div class="prototype-specs">
+        <div><i class="bi bi-shield-check"></i> <span>MONITOREO PROTEGIDO</span></div>
+        <div><i class="bi bi-speedometer2"></i> <span>DATOS EN TIEMPO REAL</span></div>
+        <div><i class="bi bi-lightning-charge"></i> <span>ESCALABLE</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECCIÓN DE PLANES -->
+  <section class="plans-section">
+    <div class="plans-heading">
+      <div>
+        <span class="section-eyebrow"><span></span> CATÁLOGO DE SERVICIOS</span>
+        <h2>
+          Elige cómo<br>
+          <em>quieres crecer.</em>
+        </h2>
+      </div>
+      <p>
+        Tres niveles para distintos tamaños de instalación. Puedes comenzar
+        pequeño y ampliar la cobertura cuando tu operación lo requiera.
+      </p>
+    </div>
+
+    <div class="plans-grid">
+      <!-- PLAN FREE -->
+      <article class="plan-card">
+        <div class="plan-top">
+          <span>01</span>
+          <div class="plan-icon"><i class="bi bi-speedometer2 fs-5"></i></div>
+        </div>
+        <span class="plan-eyebrow">PARA CONOCER FLUXGUARD</span>
+        <h3>FREE</h3>
+        <p class="plan-description">Una opción de entrada para probar el monitoreo en un punto de medición y entender el comportamiento de tu instalación.</p>
+
+        <div class="plan-price">
+          <strong>$0</strong>
+          <span>/ MES</span>
+        </div>
+
+        <ul>
+          <li><i class="bi bi-check2"></i> <span>1 circuito o medidor principal</span></li>
+          <li><i class="bi bi-check2"></i> <span>Voltaje, corriente y potencia en tiempo real</span></li>
+          <li><i class="bi bi-check2"></i> <span>Dashboard web de monitoreo</span></li>
+          <li><i class="bi bi-check2"></i> <span>Historial de hasta 7 días</span></li>
+          <li><i class="bi bi-check2"></i> <span>Reporte semanal básico</span></li>
+          <li><i class="bi bi-check2"></i> <span>Soporte por documentación y correo</span></li>
+        </ul>
+
+        <a href="pago.html?plan=free" class="plan-button">
+          COMENZAR GRATIS <i class="bi bi-arrow-up-right"></i>
+        </a>
+      </article>
+
+      <!-- PLAN STANDARD (MÁS POPULAR) -->
+      <article class="plan-card is-popular">
+        <div class="plan-popular">★ MÁS POPULAR</div>
+        <div class="plan-top">
+          <span>02</span>
+          <div class="plan-icon"><i class="bi bi-lightning-charge-fill fs-5"></i></div>
+        </div>
+        <span class="plan-eyebrow">MÁS POPULAR</span>
+        <h3>STANDARD</h3>
+        <p class="plan-description">Para oficinas y pequeñas instalaciones que necesitan controlar el consumo y detectar eventos antes de que se conviertan en un problema.</p>
+
+        <div class="plan-price">
+          <strong>DESDE $499</strong>
+          <span> MXN / MES*</span>
+        </div>
+
+        <ul>
+          <li><i class="bi bi-check2"></i> <span>Hasta 5 circuitos o zonas</span></li>
+          <li><i class="bi bi-check2"></i> <span>Todo lo incluido en Free</span></li>
+          <li><i class="bi bi-check2"></i> <span>Alertas por sobrecarga y picos de consumo</span></li>
+          <li><i class="bi bi-check2"></i> <span>Estimación de costo con tarifa configurable</span></li>
+          <li><i class="bi bi-check2"></i> <span>Exportación de reportes PDF y CSV</span></li>
+          <li><i class="bi bi-check2"></i> <span>Historial de hasta 12 meses</span></li>
+          <li><i class="bi bi-check2"></i> <span>Soporte prioritario</span></li>
+        </ul>
+
+        <a href="pago.html?plan=standard" class="plan-button">
+          ELEGIR STANDARD <i class="bi bi-arrow-up-right"></i>
+        </a>
+      </article>
+
+      <!-- PLAN ULTIMATE -->
+      <article class="plan-card">
+        <div class="plan-top">
+          <span>03</span>
+          <div class="plan-icon"><i class="bi bi-stars fs-5"></i></div>
+        </div>
+        <span class="plan-eyebrow">PARA OPERACIONES A ESCALA</span>
+        <h3>ULTIMATE</h3>
+        <p class="plan-description">Para organizaciones que necesitan administrar más puntos de medición, usuarios y sedes desde una misma plataforma.</p>
+
+        <div class="plan-price">
+          <strong>A COTIZAR</strong>
+          <span> SEGÚN ALCANCE</span>
+        </div>
+
+        <ul>
+          <li><i class="bi bi-check2"></i> <span>Más de 5 circuitos y capacidad multi-sede</span></li>
+          <li><i class="bi bi-check2"></i> <span>Todo lo incluido en Standard</span></li>
+          <li><i class="bi bi-check2"></i> <span>Automatizaciones e integraciones según proyecto</span></li>
+          <li><i class="bi bi-check2"></i> <span>Análisis avanzado de tendencias y eventos</span></li>
+          <li><i class="bi bi-check2"></i> <span>Reportes de consumo y sostenibilidad</span></li>
+          <li><i class="bi bi-check2"></i> <span>Usuarios, roles y permisos personalizables</span></li>
+          <li><i class="bi bi-check2"></i> <span>Integración API / MQTT según requerimientos</span></li>
+          <li><i class="bi bi-check2"></i> <span>Soporte especializado y atención personalizada</span></li>
+        </ul>
+
+        <a href="pago.html?plan=ultimate" class="plan-button">
+          HABLAR CON VENTAS <i class="bi bi-arrow-up-right"></i>
+        </a>
+      </article>
+    </div>
+
+    <p class="plans-note">
+      * Precio de referencia para la capa de software. Hardware, sensores,
+      instalación, calibración y personalizaciones pueden variar según el
+      proyecto. Ultimate se cotiza de acuerdo con número de puntos, sedes e
+      integraciones requeridas.
+    </p>
+  </section>
+
+  <footer class="plans-footer">
+    <span>FLUXGUARD / MONITOREA HOY, PROTEGE MAÑANA</span>
+    <a href="contacto.html">SOLICITAR INFORMACIÓN <i class="bi bi-arrow-up-right"></i></a>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
