@@ -9,8 +9,9 @@ const API_BASE = (window.location.hostname === "localhost" || window.location.ho
 
 // Limpieza automática de correos y sesiones de prueba previas
 (function() {
+  // Versiones anteriores guardaban usuarios con su contraseña sin cifrar en el navegador: se borran siempre
+  localStorage.removeItem("fluxg_usuarios");
   if (!localStorage.getItem("fluxg_v4_clean")) {
-    localStorage.removeItem("fluxg_usuarios");
     localStorage.removeItem("usuario");
     localStorage.removeItem("fluxguard_active_subscription");
     localStorage.setItem("fluxg_v4_clean", "true");
@@ -489,50 +490,23 @@ function initAuthForms() {
       }
 
       try {
-        let data = null;
-        let backendError = null;
-
-        // Intento backend Spring Boot / MongoDB Atlas
-        try {
-          const response = await fetch(`${API_BASE}/api/auth/login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password })
-          });
-          const resJson = await response.json().catch(() => null);
-          if (resJson && resJson.requiereVerificacion) {
-            // Cuenta creada pero sin verificar su correo
-            return mostrarVerificacionPendiente(alertBox, "danger", resJson.message, resJson.correo);
-          }
-          if (response.ok && resJson && resJson.success) {
-            data = resJson;
-          } else if (resJson && resJson.message && response.status !== 404) {
-            backendError = resJson.message;
-          }
-        } catch (_) {
-          backendError = null;
+        // Las cuentas solo se validan en el backend (Spring Boot / MongoDB Atlas)
+        const response = await fetch(`${API_BASE}/api/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password })
+        }).catch(() => null);
+        if (!response) {
+          throw new Error("No se pudo conectar con el servidor. Intenta de nuevo en unos momentos.");
         }
 
-        // Si el backend respondió con un rechazo explícito (ej. cuenta no encontrada o contraseña errónea en MongoDB Atlas)
-        if (backendError) {
-          throw new Error(backendError);
+        const data = await response.json().catch(() => null);
+        if (data && data.requiereVerificacion) {
+          // Cuenta creada pero sin verificar su correo
+          return mostrarVerificacionPendiente(alertBox, "danger", data.message, data.correo);
         }
-
-        // Fallback para GitHub Pages o persistencia local
-        if (!data || !data.success) {
-          const registrados = JSON.parse(localStorage.getItem("fluxg_usuarios") || "[]");
-          const userFound = registrados.find(u => u.email.toLowerCase() === email);
-
-          // REGLA ESTRICTA: Si la cuenta NO existe, TIENE PROHIBIDO ENTRAR
-          if (!userFound) {
-            throw new Error(`No existe ninguna cuenta registrada con el correo "${escapeHtml(email)}". Tienes prohibido el acceso; por favor crea una cuenta primero.`);
-          }
-
-          if (userFound.password !== password) {
-            throw new Error("Contraseña incorrecta para esta cuenta.");
-          }
-
-          data = { success: true, usuario: { nombre: userFound.nombre, apellido: userFound.apellido, correo: userFound.email } };
+        if (!response.ok || !data || !data.success) {
+          throw new Error(escapeHtml(data?.message || "No se pudo iniciar sesión. Intenta de nuevo."));
         }
 
         // Preservar suscripción existente si ya la tenía en localStorage
@@ -603,86 +577,40 @@ function initAuthForms() {
       const pwdError = validarPassword(password);
       if (pwdError) return showAlert(alertBox, "danger", pwdError);
 
-      // Verificación en frontend si ya existe localmente
-      const registrados = JSON.parse(localStorage.getItem("fluxg_usuarios") || "[]");
-      const yaExisteLocal = registrados.some(u => u.email.toLowerCase() === email);
-      if (yaExisteLocal) {
-        return showAlert(alertBox, "danger", `El correo "${escapeHtml(email)}" ya se encuentra registrado. Por favor inicia sesión.`);
-      }
-
       if (button) {
         button.disabled = true;
         button.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> CREANDO CUENTA...`;
       }
 
       try {
-        let data = null;
-        let backendError = null;
-
-        // Intento backend Spring Boot / MongoDB Atlas
-        try {
-          const response = await fetch(`${API_BASE}/api/auth/register`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              nombre: get("reg-nombre"),
-              apellido: get("reg-apellido"),
-              email: email,
-              password: password
-            })
-          });
-          const resJson = await response.json().catch(() => null);
-          if (resJson && resJson.requiereVerificacion) {
-            // Cuenta guardada en MongoDB: no se inicia sesión hasta que el usuario abra el enlace enviado con Brevo
-            if (resJson.success) registerForm.reset();
-            return mostrarVerificacionPendiente(alertBox, resJson.success ? "success" : "danger", resJson.message, resJson.correo);
-          }
-          if (response.ok && resJson && resJson.success) {
-            data = resJson;
-          } else if (resJson && resJson.message && response.status !== 404) {
-            backendError = resJson.message;
-          }
-        } catch (_) {
-          backendError = null;
+        // Las cuentas solo se guardan en el backend (Spring Boot / MongoDB Atlas)
+        const response = await fetch(`${API_BASE}/api/auth/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            nombre: get("reg-nombre"),
+            apellido: get("reg-apellido"),
+            email: email,
+            password: password
+          })
+        }).catch(() => null);
+        if (!response) {
+          throw new Error("No se pudo conectar con el servidor. Intenta de nuevo en unos momentos.");
         }
 
-        // Si el backend rechazó la creación (ej. cuenta duplicada en MongoDB Atlas)
-        if (backendError) {
-          throw new Error(backendError);
+        const data = await response.json().catch(() => null);
+        if (data && data.requiereVerificacion) {
+          // Cuenta guardada en MongoDB: no se inicia sesión hasta que el usuario abra el enlace enviado con Brevo
+          if (data.success) registerForm.reset();
+          return mostrarVerificacionPendiente(alertBox, data.success ? "success" : "danger", data.message, data.correo);
+        }
+        if (!response.ok || !data || !data.success) {
+          // Ej. cuenta duplicada o contraseña que no cumple las reglas
+          throw new Error(escapeHtml(data?.message || "No se pudo crear la cuenta. Intenta de nuevo."));
         }
 
-        // Sin backend disponible (ej. GitHub Pages): guardar en la base de datos de usuarios registrados local
-        const newUser = {
-          nombre: get("reg-nombre"),
-          apellido: get("reg-apellido"),
-          email: email,
-          password: password,
-          fechaRegistro: new Date().toISOString()
-        };
-        registrados.push(newUser);
-        localStorage.setItem("fluxg_usuarios", JSON.stringify(registrados));
-
-        // INICIAR SESIÓN DIRECTAMENTE COMO USUARIO
-        const activeUser = {
-          nombre: newUser.nombre,
-          apellido: newUser.apellido,
-          correo: newUser.email
-        };
-        localStorage.setItem("usuario", JSON.stringify(activeUser));
-
-        showAlert(alertBox, "success", `¡Cuenta creada exitosamente! Bienvenido, ${escapeHtml(activeUser.nombre)}. Iniciando sesión...`);
-
-        setTimeout(() => {
-          if (redirect) {
-            window.location.href = decodeURIComponent(redirect);
-          } else if (solicitar === "prototipo" || plan === "prototipo") {
-            window.location.href = "pago.html?plan=prototipo";
-          } else if (solicitar === "plan" && plan) {
-            window.location.href = `pago.html?plan=${plan}`;
-          } else {
-            window.location.href = "index.html";
-          }
-        }, 1000);
+        registerForm.reset();
+        showAlert(alertBox, "success", escapeHtml(data.message || "Cuenta creada. Ya puedes iniciar sesión."));
       } catch (error) {
         showAlert(alertBox, "danger", error.message || "No se pudo conectar con el servidor.");
       } finally {
