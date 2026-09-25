@@ -21,6 +21,12 @@ public class Usuario {
     private String passwordHash;
     private LocalDateTime fechaRegistro;
 
+    // Verificación de correo (Brevo). null = cuenta creada antes de la verificación, se considera verificada.
+    private Boolean verificado;
+    private String tokenVerificacionHash;
+    private LocalDateTime tokenExpira;
+    private LocalDateTime tokenEnviadoEn;
+
     public Usuario() {
         this.fechaRegistro = LocalDateTime.now();
     }
@@ -31,6 +37,11 @@ public class Usuario {
         this.correo = correo;
         this.passwordHash = passwordHash;
         this.fechaRegistro = LocalDateTime.now();
+        this.verificado = false;
+    }
+
+    public boolean estaVerificado() {
+        return verificado == null || verificado;
     }
 
     public String getId() {
@@ -79,5 +90,37 @@ public class Usuario {
 
     public void setFechaRegistro(LocalDateTime fechaRegistro) {
         this.fechaRegistro = fechaRegistro;
+    }
+
+    public Boolean getVerificado() {
+        return verificado;
+    }
+
+    public void setVerificado(Boolean verificado) {
+        this.verificado = verificado;
+    }
+
+    public String getTokenVerificacionHash() {
+        return tokenVerificacionHash;
+    }
+
+    public void setTokenVerificacionHash(String tokenVerificacionHash) {
+        this.tokenVerificacionHash = tokenVerificacionHash;
+    }
+
+    public LocalDateTime getTokenExpira() {
+        return tokenExpira;
+    }
+
+    public void setTokenExpira(LocalDateTime tokenExpira) {
+        this.tokenExpira = tokenExpira;
+    }
+
+    public LocalDateTime getTokenEnviadoEn() {
+        return tokenEnviadoEn;
+    }
+
+    public void setTokenEnviadoEn(LocalDateTime tokenEnviadoEn) {
+        this.tokenEnviadoEn = tokenEnviadoEn;
     }
 }

@@ -9,6 +9,8 @@ public class ApiResponse<T> {
     private T usuario;
     private T prospecto;
     private T prospectos;
+    private Boolean requiereVerificacion;
+    private String correo;
 
     public ApiResponse() {}
 
@@ -63,5 +65,21 @@ public class ApiResponse<T> {
 
     public void setProspectos(T prospectos) {
         this.prospectos = prospectos;
+    }
+
+    public Boolean getRequiereVerificacion() {
+        return requiereVerificacion;
+    }
+
+    public void setRequiereVerificacion(Boolean requiereVerificacion) {
+        this.requiereVerificacion = requiereVerificacion;
+    }
+
+    public String getCorreo() {
+        return correo;
+    }
+
+    public void setCorreo(String correo) {
+        this.correo = correo;
     }
 }
