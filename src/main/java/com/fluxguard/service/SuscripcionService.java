@@ -4,11 +4,10 @@ import com.fluxguard.model.Suscripcion;
 import com.fluxguard.model.Usuario;
 import org.springframework.stereotype.Service;
 
-import java.security.SecureRandom;
 import java.time.LocalDate;
 import java.util.Map;
 
-/** Planes de suscripción. Lo usan pago.html (/api/suscripcion) y la compra desde el carrito. */
+/** Planes de suscripción. Se activan cuando se confirma el pago de un pedido que incluye un plan o un kit. */
 @Service
 public class SuscripcionService {
 
@@ -21,14 +20,12 @@ public class SuscripcionService {
             "prototipo", new Plan("Prototipo Piloto", "350", 5)
     );
 
-    private final SecureRandom random = new SecureRandom();
-
-    public boolean existe(String tipo) {
-        return PLANES.containsKey(tipo);
-    }
-
-    /** Asigna el plan al usuario (sin guardarlo). Lanza IllegalArgumentException si el plan no existe. */
-    public void activar(Usuario usuario, String tipo) {
+    /**
+     * Asigna el plan al usuario (sin guardarlo). Lanza IllegalArgumentException si el plan no existe.
+     *
+     * @param transaccionId folio del pedido con el que se pagó
+     */
+    public void activar(Usuario usuario, String tipo, String transaccionId) {
         Plan plan = PLANES.get(tipo);
         if (plan == null) {
             throw new IllegalArgumentException("El plan seleccionado no existe.");
@@ -36,7 +33,7 @@ public class SuscripcionService {
         LocalDate hoy = LocalDate.now();
         usuario.setSuscripcion(new Suscripcion(
                 plan.nombre(), tipo, plan.precio(), "Activa", plan.circuitos(),
-                hoy, hoy.plusMonths(1), "FLX-" + (100000 + random.nextInt(900000))
+                hoy, hoy.plusMonths(1), transaccionId
         ));
     }
 }

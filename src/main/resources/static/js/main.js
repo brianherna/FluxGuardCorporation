@@ -49,16 +49,43 @@ function cerrarSesion() {
 }
 
 // fetch con el token de sesión. Si el servidor responde 401, la sesión local se borra.
+// Sin sesión, el carrito y los pedidos se identifican con un token de invitado propio de este navegador.
 async function apiFetch(path, options = {}) {
   const token = localStorage.getItem("fluxg_token");
   const headers = { ...(options.headers || {}) };
   if (token) headers["Authorization"] = `Bearer ${token}`;
+  else headers["X-Carrito-Invitado"] = tokenInvitado();
   const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
   if (response.status === 401) {
     localStorage.removeItem("fluxg_token");
     localStorage.removeItem("usuario");
   }
   return response;
+}
+
+function tokenInvitado() {
+  let token = localStorage.getItem("fluxg_invitado");
+  if (!token) {
+    const bytes = new Uint8Array(24);
+    crypto.getRandomValues(bytes);
+    token = Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+    localStorage.setItem("fluxg_invitado", token);
+  }
+  return token;
+}
+
+// Al iniciar sesión, lo que se agregó como invitado pasa al carrito de la cuenta
+async function fusionarCarritoInvitado() {
+  const invitado = localStorage.getItem("fluxg_invitado");
+  const token = localStorage.getItem("fluxg_token");
+  if (!invitado || !token) return;
+  try {
+    const response = await fetch(`${API_BASE}/api/carrito/fusionar`, {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${token}`, "X-Carrito-Invitado": invitado }
+    });
+    if (response.ok) localStorage.removeItem("fluxg_invitado");
+  } catch (_) {}
 }
 
 // Devuelve el usuario de la sesión validado por el servidor, o null si no hay sesión válida
@@ -577,6 +604,7 @@ function initAuthForms() {
 
         // La suscripción viene del servidor junto con el usuario
         guardarSesion(data.token, data.usuario);
+        await fusionarCarritoInvitado();
 
         const destino = rutaSegura(redirect);
         if (destino) {
@@ -739,13 +767,8 @@ function initPlanes() {
   if (btnProto) {
     btnProto.addEventListener("click", (e) => {
       e.preventDefault();
-      const rawUser = localStorage.getItem("usuario");
-      const target = "pago.html?plan=prototipo";
-      if (!rawUser) {
-        window.location.href = `login.html?solicitar=plan&plan=prototipo&redirect=${encodeURIComponent(target)}`;
-      } else {
-        window.location.href = target;
-      }
+      // El kit piloto se puede comprar sin cuenta
+      window.location.href = "pago.html?plan=prototipo";
     });
   }
 
@@ -811,9 +834,8 @@ function initCarrito() {
       </div>`);
   }
 
-  if (localStorage.getItem("fluxg_token")) {
-    cargarCarrito().then(renderPanelCarrito).catch(() => {});
-  }
+  // Con o sin sesión: sin sesión se usa el carrito de invitado
+  cargarCarrito().then(renderPanelCarrito).catch(() => {});
 }
 
 async function cargarCarrito() {
@@ -823,24 +845,17 @@ async function cargarCarrito() {
   return data.carrito;
 }
 
-function irALoginDesdeAqui() {
-  window.location.href = `login.html?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
-}
-
-// Agrega un producto. Sin sesión, manda al login y luego regresa a la página actual.
+// Agrega un producto al carrito (con sesión o como invitado).
 async function agregarAlCarrito(productoId, cantidad = 1) {
-  if (!localStorage.getItem("fluxg_token")) {
-    irALoginDesdeAqui();
-    return null;
-  }
-  const response = await apiFetch("/api/carrito/items", {
+  const enviar = () => apiFetch("/api/carrito/items", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ productoId, cantidad })
   });
+  let response = await enviar();
   if (response.status === 401) {
-    irALoginDesdeAqui();
-    return null;
+    // La sesión venció: apiFetch ya la olvidó, se reintenta como invitado
+    response = await enviar();
   }
   const data = await response.json().catch(() => null);
   if (!response.ok || !data?.success) throw new Error(data?.message || "No se pudo agregar al carrito.");
@@ -865,7 +880,6 @@ async function cambiarCantidadCarrito(productoId, cantidad) {
 function abrirCarrito() {
   const panel = document.getElementById("carritoPanel");
   if (!panel || typeof bootstrap === "undefined") return;
-  if (!localStorage.getItem("fluxg_token")) renderPanelCarrito(null);
   bootstrap.Offcanvas.getOrCreateInstance(panel).show();
 }
 
@@ -925,17 +939,6 @@ function renderPanelCarrito(carrito) {
   actualizarContadorCarrito(carrito);
   const body = document.getElementById("carritoPanelBody");
   if (!body) return;
-
-  if (!localStorage.getItem("fluxg_token")) {
-    const redirect = encodeURIComponent(window.location.pathname + window.location.search);
-    body.innerHTML = `
-      <div class="cart-empty">
-        <i class="bi bi-person-lock"></i>
-        <p>Inicia sesión para guardar productos en tu carrito.</p>
-        <a href="login.html?redirect=${redirect}" class="plan-button">INICIAR SESIÓN <i class="bi bi-arrow-up-right"></i></a>
-      </div>`;
-    return;
-  }
 
   if (!carrito || carrito.lineas.length === 0) {
     body.innerHTML = `

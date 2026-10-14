@@ -7,9 +7,18 @@ import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDateTime;
 import java.util.List;
 
-/** Compra confirmada desde el carrito. Guarda nombre y precio de cada línea tal como estaban al comprar. */
+/**
+ * Compra hecha desde el carrito. Guarda nombre y precio de cada línea tal como estaban al comprar.
+ * Nace como PENDIENTE y pasa a PAGADO solo cuando PayPal confirma el cobro.
+ */
 @Document(collection = "pedidos")
 public class Pedido {
+
+    public static final String PENDIENTE = "PENDIENTE";
+    public static final String PAGADO = "PAGADO";
+    public static final String RECHAZADO = "RECHAZADO";
+    public static final String CANCELADO = "CANCELADO";
+    public static final String REEMBOLSADO = "REEMBOLSADO";
 
     @Id
     private String id;
@@ -17,13 +26,24 @@ public class Pedido {
     @Indexed(unique = true)
     private String folio;
 
+    /** Id del usuario, o "invitado:<hash>" si se compró sin iniciar sesión (ver Comprador). */
     @Indexed
     private String usuarioId;
+
+    private String nombreCliente;
+    private String correoCliente;
 
     private List<Linea> lineas;
     private int total;
     private String estado;
     private LocalDateTime fecha;
+
+    // PayPal: ordenId es la orden creada; pagoId es el id del cobro (capture)
+    private String ordenId;
+    private String urlPago;
+    private String pagoId;
+    private String metodoPago;
+    private LocalDateTime pagadoEn;
 
     public Pedido() {}
 
@@ -34,6 +54,10 @@ public class Pedido {
         this.total = total;
         this.estado = estado;
         this.fecha = fecha;
+    }
+
+    public boolean estaPagado() {
+        return PAGADO.equals(estado);
     }
 
     public record Linea(String productoId, String nombre, int precioUnitario, int cantidad, int importe) {}
@@ -92,5 +116,61 @@ public class Pedido {
 
     public void setFecha(LocalDateTime fecha) {
         this.fecha = fecha;
+    }
+
+    public String getOrdenId() {
+        return ordenId;
+    }
+
+    public void setOrdenId(String ordenId) {
+        this.ordenId = ordenId;
+    }
+
+    public String getUrlPago() {
+        return urlPago;
+    }
+
+    public void setUrlPago(String urlPago) {
+        this.urlPago = urlPago;
+    }
+
+    public String getPagoId() {
+        return pagoId;
+    }
+
+    public void setPagoId(String pagoId) {
+        this.pagoId = pagoId;
+    }
+
+    public String getMetodoPago() {
+        return metodoPago;
+    }
+
+    public void setMetodoPago(String metodoPago) {
+        this.metodoPago = metodoPago;
+    }
+
+    public LocalDateTime getPagadoEn() {
+        return pagadoEn;
+    }
+
+    public void setPagadoEn(LocalDateTime pagadoEn) {
+        this.pagadoEn = pagadoEn;
+    }
+
+    public String getNombreCliente() {
+        return nombreCliente;
+    }
+
+    public void setNombreCliente(String nombreCliente) {
+        this.nombreCliente = nombreCliente;
+    }
+
+    public String getCorreoCliente() {
+        return correoCliente;
+    }
+
+    public void setCorreoCliente(String correoCliente) {
+        this.correoCliente = correoCliente;
     }
 }

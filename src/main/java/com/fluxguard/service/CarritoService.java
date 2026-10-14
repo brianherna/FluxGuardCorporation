@@ -5,10 +5,8 @@ import com.fluxguard.model.Carrito;
 import com.fluxguard.model.Pedido;
 import com.fluxguard.model.Producto;
 import com.fluxguard.model.Producto.Categoria;
-import com.fluxguard.model.Usuario;
 import com.fluxguard.repository.CarritoRepository;
 import com.fluxguard.repository.PedidoRepository;
-import com.fluxguard.repository.UsuarioRepository;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
@@ -21,9 +19,10 @@ import java.util.Optional;
 /**
  * Reglas del carrito:
  * - Solo un plan a la vez (agregar otro lo reemplaza) y siempre con cantidad 1.
- * - Personalizaciones y garantía requieren un kit piloto en el carrito o comprado antes,
+ * - Personalizaciones y garantía requieren un kit piloto en el carrito o comprado (y pagado) antes,
  *   y se permite como máximo una de cada una por kit.
  * - Los precios siempre salen del catálogo, nunca del navegador.
+ * - Los invitados (sin sesión) pueden comprar hardware y servicios, pero no planes: un plan se activa en una cuenta.
  */
 @Service
 public class CarritoService {
@@ -35,28 +34,23 @@ public class CarritoService {
         }
     }
 
-    public record Compra(Pedido pedido, Usuario usuario) {}
-
     private final CarritoRepository carritoRepository;
     private final PedidoRepository pedidoRepository;
-    private final UsuarioRepository usuarioRepository;
     private final CatalogoService catalogo;
-    private final SuscripcionService suscripcionService;
     private final SecureRandom random = new SecureRandom();
 
-    public CarritoService(CarritoRepository carritoRepository, PedidoRepository pedidoRepository,
-                          UsuarioRepository usuarioRepository, CatalogoService catalogo,
-                          SuscripcionService suscripcionService) {
+    public CarritoService(CarritoRepository carritoRepository, PedidoRepository pedidoRepository, CatalogoService catalogo) {
         this.carritoRepository = carritoRepository;
         this.pedidoRepository = pedidoRepository;
-        this.usuarioRepository = usuarioRepository;
         this.catalogo = catalogo;
-        this.suscripcionService = suscripcionService;
     }
 
-    public CarritoDto ver(Usuario usuario) {
-        Carrito carrito = obtener(usuario);
-        int kitsComprados = kitsComprados(usuario);
+    private static final String PLAN_REQUIERE_CUENTA =
+            "Para comprar un plan necesitas iniciar sesión: el plan se activa en tu cuenta.";
+
+    public CarritoDto ver(Comprador comprador) {
+        Carrito carrito = obtener(comprador);
+        int kitsComprados = kitsComprados(comprador);
         List<String> avisos = normalizar(carrito, kitsComprados);
         if (!avisos.isEmpty()) {
             guardar(carrito);
@@ -64,15 +58,19 @@ public class CarritoService {
         return aDto(carrito, kitsComprados, avisos);
     }
 
-    public CarritoDto agregar(Usuario usuario, String productoId, int cantidad) {
+    public CarritoDto agregar(Comprador comprador, String productoId, int cantidad) {
         Producto producto = catalogo.buscar(productoId)
                 .orElseThrow(() -> new CarritoException("El producto no existe."));
         if (cantidad < 1) {
             throw new CarritoException("La cantidad debe ser al menos 1.");
         }
 
-        Carrito carrito = obtener(usuario);
-        int kitsComprados = kitsComprados(usuario);
+        if (producto.categoria() == Categoria.PLAN && comprador.esInvitado()) {
+            throw new CarritoException(PLAN_REQUIERE_CUENTA);
+        }
+
+        Carrito carrito = obtener(comprador);
+        int kitsComprados = kitsComprados(comprador);
 
         if (producto.categoria() == Categoria.PLAN) {
             // Un solo plan: se reemplaza el que hubiera
@@ -94,9 +92,9 @@ public class CarritoService {
     }
 
     /** Cambia la cantidad de un producto del carrito. Con cantidad 0 lo quita. */
-    public CarritoDto cambiarCantidad(Usuario usuario, String productoId, int cantidad) {
-        Carrito carrito = obtener(usuario);
-        int kitsComprados = kitsComprados(usuario);
+    public CarritoDto cambiarCantidad(Comprador comprador, String productoId, int cantidad) {
+        Carrito carrito = obtener(comprador);
+        int kitsComprados = kitsComprados(comprador);
         Carrito.Item item = buscarItem(carrito, productoId)
                 .orElseThrow(() -> new CarritoException("Ese producto no está en tu carrito."));
 
@@ -115,10 +113,13 @@ public class CarritoService {
         return aDto(carrito, kitsComprados, avisos);
     }
 
-    /** Convierte el carrito en un pedido, activa el plan si hay uno y vacía el carrito. */
-    public Compra comprar(Usuario usuario) {
-        Carrito carrito = obtener(usuario);
-        int kitsComprados = kitsComprados(usuario);
+    /**
+     * Crea un pedido PENDIENTE con el contenido actual del carrito (precios del catálogo).
+     * El carrito no se toca: se vacía cuando el pago se confirma (PagoService).
+     */
+    public Pedido crearPedido(Comprador comprador) {
+        Carrito carrito = obtener(comprador);
+        int kitsComprados = kitsComprados(comprador);
         List<String> avisos = normalizar(carrito, kitsComprados);
         if (!avisos.isEmpty()) {
             guardar(carrito);
@@ -127,40 +128,60 @@ public class CarritoService {
         if (carrito.getItems().isEmpty()) {
             throw new CarritoException("Tu carrito está vacío.");
         }
+        if (comprador.esInvitado() && carrito.getItems().stream().anyMatch(item -> esPlan(item.getProductoId()))) {
+            throw new CarritoException(PLAN_REQUIERE_CUENTA);
+        }
 
         List<Pedido.Linea> lineas = new ArrayList<>();
         int total = 0;
-        Producto plan = null;
-        boolean incluyeKit = false;
         for (Carrito.Item item : carrito.getItems()) {
             Producto producto = catalogo.buscar(item.getProductoId()).orElseThrow();
             int importe = producto.precio() * item.getCantidad();
             lineas.add(new Pedido.Linea(producto.id(), producto.nombre(), producto.precio(), item.getCantidad(), importe));
             total += importe;
-            if (producto.categoria() == Categoria.PLAN) {
-                plan = producto;
-            }
-            if (producto.id().equals(CatalogoService.KIT_PILOTO)) {
-                incluyeKit = true;
-            }
         }
 
-        // Pago simulado: falta integrar una pasarela de pago real
-        Pedido pedido = pedidoRepository.save(new Pedido(
-                "FLX-P" + (10000000 + random.nextInt(90000000)), usuario.getId(), lineas, total,
-                "Pagado (simulado)", LocalDateTime.now()));
-
-        if (plan != null) {
-            suscripcionService.activar(usuario, CatalogoService.tipoDePlan(plan));
-        } else if (incluyeKit && usuario.getSuscripcion() == null) {
-            // Igual que en pago.html: el kit piloto incluye el dashboard
-            suscripcionService.activar(usuario, "prototipo");
+        Pedido pedido = new Pedido("FLX-P" + (10000000 + random.nextInt(90000000)), comprador.clave(), lineas, total,
+                Pedido.PENDIENTE, LocalDateTime.now());
+        if (!comprador.esInvitado()) {
+            // Los datos del invitado se toman de su cuenta de PayPal al cobrar
+            pedido.setNombreCliente((comprador.usuario().getNombre() + " " + comprador.usuario().getApellido()).trim());
+            pedido.setCorreoCliente(comprador.usuario().getCorreo());
         }
-        Usuario guardado = usuarioRepository.save(usuario);
+        return pedidoRepository.save(pedido);
+    }
 
-        carrito.getItems().clear();
-        guardar(carrito);
-        return new Compra(pedido, guardado);
+    /**
+     * Pasa a la cuenta lo que el usuario agregó como invitado antes de iniciar sesión.
+     * Lo que no cabe (p. ej. accesorios de más) se omite; el carrito de invitado queda vacío.
+     */
+    public CarritoDto fusionar(Comprador invitado, Comprador usuario) {
+        List<String> avisos = new ArrayList<>();
+        carritoRepository.findByUsuarioId(invitado.clave()).ifPresent(carritoInvitado -> {
+            // Primero los kits, para que los accesorios tengan a qué asociarse
+            List<Carrito.Item> items = new ArrayList<>(carritoInvitado.getItems());
+            items.sort((a, b) -> Boolean.compare(!CatalogoService.KIT_PILOTO.equals(a.getProductoId()),
+                    !CatalogoService.KIT_PILOTO.equals(b.getProductoId())));
+            for (Carrito.Item item : items) {
+                try {
+                    agregar(usuario, item.getProductoId(), item.getCantidad());
+                } catch (CarritoException e) {
+                    avisos.add(e.getMessage());
+                }
+            }
+            carritoInvitado.getItems().clear();
+            guardar(carritoInvitado);
+        });
+        CarritoDto carrito = ver(usuario);
+        avisos.addAll(carrito.avisos());
+        return new CarritoDto(carrito.lineas(), carrito.total(), carrito.cantidadArticulos(), avisos);
+    }
+
+    public void vaciar(String usuarioId) {
+        carritoRepository.findByUsuarioId(usuarioId).ifPresent(carrito -> {
+            carrito.getItems().clear();
+            guardar(carrito);
+        });
     }
 
     private void validarCantidad(Carrito carrito, Producto producto, int cantidad, int kitsComprados) {
@@ -223,8 +244,8 @@ public class CarritoService {
         return new CarritoDto(lineas, total, articulos, avisos);
     }
 
-    private Carrito obtener(Usuario usuario) {
-        return carritoRepository.findByUsuarioId(usuario.getId()).orElseGet(() -> new Carrito(usuario.getId()));
+    private Carrito obtener(Comprador comprador) {
+        return carritoRepository.findByUsuarioId(comprador.clave()).orElseGet(() -> new Carrito(comprador.clave()));
     }
 
     private void guardar(Carrito carrito) {
@@ -236,8 +257,9 @@ public class CarritoService {
         return kitsComprados + buscarItem(carrito, CatalogoService.KIT_PILOTO).map(Carrito.Item::getCantidad).orElse(0);
     }
 
-    private int kitsComprados(Usuario usuario) {
-        return pedidoRepository.findByUsuarioIdOrderByFechaDesc(usuario.getId()).stream()
+    private int kitsComprados(Comprador comprador) {
+        return pedidoRepository.findByUsuarioIdOrderByFechaDesc(comprador.clave()).stream()
+                .filter(Pedido::estaPagado)
                 .flatMap(pedido -> pedido.getLineas().stream())
                 .filter(linea -> CatalogoService.KIT_PILOTO.equals(linea.productoId()))
                 .mapToInt(Pedido.Linea::cantidad)

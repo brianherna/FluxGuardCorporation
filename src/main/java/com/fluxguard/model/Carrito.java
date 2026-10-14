@@ -15,6 +15,7 @@ public class Carrito {
     @Id
     private String id;
 
+    /** Id del usuario, o "invitado:<hash>" para un carrito sin sesión (ver Comprador). */
     @Indexed(unique = true)
     private String usuarioId;
 
