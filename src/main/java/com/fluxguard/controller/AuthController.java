@@ -8,6 +8,8 @@ import com.fluxguard.dto.UsuarioDto;
 import com.fluxguard.model.Usuario;
 import com.fluxguard.repository.UsuarioRepository;
 import com.fluxguard.service.BrevoEmailService;
+import com.fluxguard.service.SesionService;
+import com.fluxguard.service.Tokens;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -16,39 +18,39 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestClientException;
 
 import java.net.URI;
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
-import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.Base64;
-import java.util.HexFormat;
 import java.util.Optional;
 import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/auth")
-@CrossOrigin(origins = "*")
 public class AuthController {
 
     private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
     private static final int HORAS_VIGENCIA_ENLACE = 24;
     private static final Duration ESPERA_REENVIO = Duration.ofSeconds(60);
+    private static final String CREDENCIALES_INCORRECTAS = "Correo o contraseña incorrectos.";
+    private static final String REENVIO_GENERICO = "Si hay una cuenta pendiente de verificación con ese correo, te enviamos un enlace nuevo.";
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
     private final BrevoEmailService emailService;
+    private final SesionService sesionService;
     private final String appBaseUrl;
-    private final SecureRandom random = new SecureRandom();
+    // Hash de relleno: el login tarda lo mismo exista o no el correo, así no se puede adivinar qué cuentas existen
+    private final String hashRelleno;
 
     public AuthController(UsuarioRepository usuarioRepository,
                           PasswordEncoder passwordEncoder,
                           BrevoEmailService emailService,
+                          SesionService sesionService,
                           @Value("${app.base-url:${APP_BASE_URL:http://localhost:8080}}") String appBaseUrl) {
         this.usuarioRepository = usuarioRepository;
         this.passwordEncoder = passwordEncoder;
         this.emailService = emailService;
+        this.sesionService = sesionService;
+        this.hashRelleno = passwordEncoder.encode(Tokens.nuevo());
         this.appBaseUrl = appBaseUrl.trim().replaceAll("/+$", "");
     }
 
@@ -129,16 +131,13 @@ public class AuthController {
                     .body(ApiResponse.error("El correo electrónico es obligatorio."));
         }
 
+        // Misma respuesta si el correo no existe o ya está verificado, para no revelar qué cuentas existen
         Optional<Usuario> optionalUsuario = usuarioRepository.findByCorreo(email);
-        if (optionalUsuario.isEmpty()) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(ApiResponse.error("No existe ninguna cuenta registrada con este correo electrónico."));
+        if (optionalUsuario.isEmpty() || optionalUsuario.get().estaVerificado()) {
+            return ResponseEntity.ok(ApiResponse.ok(REENVIO_GENERICO));
         }
 
         Usuario usuario = optionalUsuario.get();
-        if (usuario.estaVerificado()) {
-            return ResponseEntity.ok(ApiResponse.ok("Tu cuenta ya está verificada. Inicia sesión para continuar."));
-        }
 
         long espera = segundosParaReenvio(usuario);
         if (espera > 0) {
@@ -154,7 +153,7 @@ public class AuthController {
                     .body(pendienteDeVerificacion(false, "No pudimos enviar el correo de verificación. Intenta de nuevo en unos momentos.", usuario));
         }
 
-        return ResponseEntity.ok(pendienteDeVerificacion(true, "Te enviamos un enlace nuevo a " + usuario.getCorreo() + ".", usuario));
+        return ResponseEntity.ok(ApiResponse.ok(REENVIO_GENERICO));
     }
 
     @PostMapping("/login")
@@ -169,14 +168,15 @@ public class AuthController {
 
         Optional<Usuario> optionalUsuario = usuarioRepository.findByCorreo(email);
         if (optionalUsuario.isEmpty()) {
+            passwordEncoder.matches(password, hashRelleno);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("No existe ninguna cuenta registrada con este correo electrónico. Tienes prohibido el acceso hasta que crees una cuenta."));
+                    .body(ApiResponse.error(CREDENCIALES_INCORRECTAS));
         }
 
         Usuario usuario = optionalUsuario.get();
         if (!passwordEncoder.matches(password, usuario.getPasswordHash())) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(ApiResponse.error("Contraseña incorrecta para esta cuenta."));
+                    .body(ApiResponse.error(CREDENCIALES_INCORRECTAS));
         }
 
         if (!usuario.estaVerificado()) {
@@ -185,8 +185,28 @@ public class AuthController {
         }
 
         ApiResponse<UsuarioDto> response = ApiResponse.ok("Inicio de sesión correcto");
-        response.setUsuario(toDto(usuario));
+        response.setUsuario(UsuarioDto.de(usuario));
+        response.setToken(sesionService.crear(usuario));
         return ResponseEntity.ok(response);
+    }
+
+    /** Datos del usuario de la sesión actual (encabezado Authorization: Bearer <token>). */
+    @GetMapping("/me")
+    public ResponseEntity<ApiResponse<UsuarioDto>> me(@RequestHeader(value = "Authorization", required = false) String authorization) {
+        Optional<Usuario> usuario = sesionService.usuarioDesde(authorization);
+        if (usuario.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Tu sesión expiró. Inicia sesión de nuevo."));
+        }
+        ApiResponse<UsuarioDto> response = ApiResponse.ok("Sesión activa");
+        response.setUsuario(UsuarioDto.de(usuario.get()));
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/logout")
+    public ResponseEntity<ApiResponse<Void>> logout(@RequestHeader(value = "Authorization", required = false) String authorization) {
+        sesionService.cerrar(authorization);
+        return ResponseEntity.ok(ApiResponse.ok("Sesión cerrada"));
     }
 
     /** Devuelve "ok", "expirado" o "invalido" según el token del enlace. */
@@ -195,7 +215,7 @@ public class AuthController {
             return "invalido";
         }
 
-        Optional<Usuario> optionalUsuario = usuarioRepository.findByTokenVerificacionHash(sha256(token));
+        Optional<Usuario> optionalUsuario = usuarioRepository.findByTokenVerificacionHash(Tokens.sha256(token));
         if (optionalUsuario.isEmpty()) {
             return "invalido";
         }
@@ -214,11 +234,9 @@ public class AuthController {
 
     /** Genera un token aleatorio, guarda solo su hash en el usuario y devuelve el token en claro para el enlace. */
     private String asignarToken(Usuario usuario) {
-        byte[] bytes = new byte[32];
-        random.nextBytes(bytes);
-        String token = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+        String token = Tokens.nuevo();
         LocalDateTime ahora = LocalDateTime.now();
-        usuario.setTokenVerificacionHash(sha256(token));
+        usuario.setTokenVerificacionHash(Tokens.sha256(token));
         usuario.setTokenExpira(ahora.plusHours(HORAS_VIGENCIA_ENLACE));
         usuario.setTokenEnviadoEn(ahora);
         return token;
@@ -247,25 +265,6 @@ public class AuthController {
         response.setRequiereVerificacion(true);
         response.setCorreo(usuario.getCorreo());
         return response;
-    }
-
-    private static String sha256(String valor) {
-        try {
-            byte[] hash = MessageDigest.getInstance("SHA-256").digest(valor.getBytes(StandardCharsets.UTF_8));
-            return HexFormat.of().formatHex(hash);
-        } catch (NoSuchAlgorithmException e) {
-            throw new IllegalStateException("SHA-256 no disponible", e);
-        }
-    }
-
-    private UsuarioDto toDto(Usuario usuario) {
-        return new UsuarioDto(
-                usuario.getId(),
-                usuario.getNombre(),
-                usuario.getApellido(),
-                usuario.getCorreo(),
-                usuario.getFechaRegistro()
-        );
     }
 
     private boolean tieneMayuscula(String pwd) {

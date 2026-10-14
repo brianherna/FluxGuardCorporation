@@ -1,6 +1,10 @@
 package com.fluxguard.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fluxguard.model.Pedido;
+import com.fluxguard.model.Producto;
+
+import java.util.List;
 
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class ApiResponse<T> {
@@ -11,6 +15,10 @@ public class ApiResponse<T> {
     private T prospectos;
     private Boolean requiereVerificacion;
     private String correo;
+    private String token;
+    private CarritoDto carrito;
+    private Pedido pedido;
+    private List<Producto> productos;
 
     public ApiResponse() {}
 
@@ -81,5 +89,37 @@ public class ApiResponse<T> {
 
     public void setCorreo(String correo) {
         this.correo = correo;
+    }
+
+    public String getToken() {
+        return token;
+    }
+
+    public void setToken(String token) {
+        this.token = token;
+    }
+
+    public CarritoDto getCarrito() {
+        return carrito;
+    }
+
+    public void setCarrito(CarritoDto carrito) {
+        this.carrito = carrito;
+    }
+
+    public Pedido getPedido() {
+        return pedido;
+    }
+
+    public void setPedido(Pedido pedido) {
+        this.pedido = pedido;
+    }
+
+    public List<Producto> getProductos() {
+        return productos;
+    }
+
+    public void setProductos(List<Producto> productos) {
+        this.productos = productos;
     }
 }

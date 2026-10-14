@@ -16,11 +16,76 @@ const API_BASE = (window.location.hostname === "localhost" || window.location.ho
     localStorage.removeItem("fluxguard_active_subscription");
     localStorage.setItem("fluxg_v4_clean", "true");
   }
-  // En las páginas de login y registro nunca debe haber sesión activa preexistente
-  if (window.location.pathname.includes("login.html") || window.location.pathname.includes("crear-cuenta.html")) {
+  // Un "usuario" sin token de sesión viene de versiones anteriores (sin validación en el servidor): se descarta
+  if (!localStorage.getItem("fluxg_token")) {
     localStorage.removeItem("usuario");
   }
+  // En las páginas de login y registro nunca debe haber sesión activa preexistente
+  if (window.location.pathname.includes("login.html") || window.location.pathname.includes("crear-cuenta.html")) {
+    cerrarSesion();
+  }
 })();
+
+// ===== Sesión =====
+// El servidor entrega un token al iniciar sesión; "usuario" en localStorage es solo una copia para mostrar el nombre.
+// Las páginas protegidas confirman la sesión con /api/auth/me antes de mostrar datos.
+
+function guardarSesion(token, usuario) {
+  localStorage.setItem("fluxg_token", token);
+  localStorage.setItem("usuario", JSON.stringify(usuario));
+}
+
+function actualizarUsuario(usuario) {
+  localStorage.setItem("usuario", JSON.stringify(usuario));
+}
+
+function cerrarSesion() {
+  const token = localStorage.getItem("fluxg_token");
+  localStorage.removeItem("fluxg_token");
+  localStorage.removeItem("usuario");
+  if (token) {
+    fetch(`${API_BASE}/api/auth/logout`, { method: "POST", headers: { "Authorization": `Bearer ${token}` } }).catch(() => {});
+  }
+}
+
+// fetch con el token de sesión. Si el servidor responde 401, la sesión local se borra.
+async function apiFetch(path, options = {}) {
+  const token = localStorage.getItem("fluxg_token");
+  const headers = { ...(options.headers || {}) };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  if (response.status === 401) {
+    localStorage.removeItem("fluxg_token");
+    localStorage.removeItem("usuario");
+  }
+  return response;
+}
+
+// Devuelve el usuario de la sesión validado por el servidor, o null si no hay sesión válida
+async function obtenerUsuarioSesion() {
+  if (!localStorage.getItem("fluxg_token")) return null;
+  try {
+    const response = await apiFetch("/api/auth/me");
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.success || !data.usuario) return null;
+    actualizarUsuario(data.usuario);
+    return data.usuario;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Solo permite redirigir a páginas del mismo sitio (evita redirecciones a dominios externos o "javascript:")
+function rutaSegura(destino) {
+  if (!destino) return null;
+  try {
+    const url = new URL(destino, window.location.href);
+    if (url.origin !== window.location.origin) return null;
+    return url.pathname + url.search + url.hash;
+  } catch (_) {
+    return null;
+  }
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   initNavbar();
@@ -33,6 +98,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initPasswordToggles();
   initAuthForms();
   initPlanes();
+  initCarrito();
 });
 
 function initNavbar() {
@@ -74,7 +140,7 @@ function initNavbarAuth() {
     container.innerHTML = `
       <div class="dropdown">
         <button class="btn-flux-outline dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-          <i class="bi bi-person-circle"></i> ${nombre} ${subBadge}
+          <i class="bi bi-person-circle"></i> <span class="navbar-user-name">${nombre} ${subBadge}</span>
         </button>
         <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
           <li><h6 class="dropdown-header">${correo}</h6></li>
@@ -86,7 +152,7 @@ function initNavbarAuth() {
         </ul>
       </div>`;
     document.getElementById("btn-logout")?.addEventListener("click", () => {
-      localStorage.removeItem("usuario");
+      cerrarSesion();
       window.location.href = "index.html";
     });
   } catch {
@@ -467,7 +533,7 @@ function initAuthForms() {
 
     // Botón para limpiar todos los datos y correos en caché
     document.getElementById("btn-reset-cache")?.addEventListener("click", () => {
-      localStorage.removeItem("usuario");
+      cerrarSesion();
       localStorage.removeItem("fluxg_usuarios");
       localStorage.removeItem("fluxguard_active_subscription");
       showAlert(alertBox, "info", "Se han borrado todos los correos y sesiones guardadas. Ahora el sistema está completamente limpio.");
@@ -509,21 +575,12 @@ function initAuthForms() {
           throw new Error(escapeHtml(data?.message || "No se pudo iniciar sesión. Intenta de nuevo."));
         }
 
-        // Preservar suscripción existente si ya la tenía en localStorage
-        const prevUserRaw = localStorage.getItem("usuario");
-        if (prevUserRaw) {
-          try {
-            const prevUser = JSON.parse(prevUserRaw);
-            if (prevUser.correo === data.usuario.correo && prevUser.suscripcion) {
-              data.usuario.suscripcion = prevUser.suscripcion;
-            }
-          } catch (_) {}
-        }
+        // La suscripción viene del servidor junto con el usuario
+        guardarSesion(data.token, data.usuario);
 
-        localStorage.setItem("usuario", JSON.stringify(data.usuario));
-
-        if (redirect) {
-          window.location.href = decodeURIComponent(redirect);
+        const destino = rutaSegura(redirect);
+        if (destino) {
+          window.location.href = destino;
         } else if (solicitar === "prototipo" || plan === "prototipo") {
           window.location.href = "pago.html?plan=prototipo";
         } else if (solicitar === "plan" && plan) {
@@ -722,4 +779,183 @@ function showAlert(container, type, message) {
 
 function escapeHtml(value) {
   return String(value).replace(/[&<>'"]/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","'":"&#39;","\"":"&quot;"}[char]));
+}
+
+// ===== Carrito de compras =====
+// El carrito vive en el servidor (/api/carrito) ligado a la sesión; aquí solo se dibuja.
+
+const dinero = n => "$" + Number(n || 0).toLocaleString("es-MX");
+
+function initCarrito() {
+  // Va al inicio del grupo de botones de sesión de la barra (cada página tiene su propia versión)
+  const authAction = document.getElementById("navbar-auth-action") || document.querySelector("header.navbar .navbar-actions");
+  if (authAction && !document.getElementById("navbar-cart-btn")) {
+    authAction.insertAdjacentHTML("afterbegin", `
+      <button type="button" class="navbar-cart" id="navbar-cart-btn" aria-label="Abrir carrito">
+        <i class="bi bi-cart3"></i><span class="navbar-cart-count" id="navbar-cart-count" hidden>0</span>
+      </button>`);
+    document.getElementById("navbar-cart-btn").addEventListener("click", abrirCarrito);
+  }
+
+  if (!document.getElementById("carritoPanel")) {
+    document.body.insertAdjacentHTML("beforeend", `
+      <div class="offcanvas offcanvas-end cart-panel" tabindex="-1" id="carritoPanel" aria-labelledby="carritoPanelTitulo">
+        <div class="offcanvas-header">
+          <div>
+            <span class="cart-panel-kicker">FLUXGUARD / TIENDA</span>
+            <h2 class="offcanvas-title" id="carritoPanelTitulo">Tu carrito</h2>
+          </div>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" aria-label="Cerrar"></button>
+        </div>
+        <div class="offcanvas-body" id="carritoPanelBody"></div>
+      </div>`);
+  }
+
+  if (localStorage.getItem("fluxg_token")) {
+    cargarCarrito().then(renderPanelCarrito).catch(() => {});
+  }
+}
+
+async function cargarCarrito() {
+  const response = await apiFetch("/api/carrito");
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.success) throw new Error(data?.message || "No se pudo cargar el carrito.");
+  return data.carrito;
+}
+
+function irALoginDesdeAqui() {
+  window.location.href = `login.html?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}`;
+}
+
+// Agrega un producto. Sin sesión, manda al login y luego regresa a la página actual.
+async function agregarAlCarrito(productoId, cantidad = 1) {
+  if (!localStorage.getItem("fluxg_token")) {
+    irALoginDesdeAqui();
+    return null;
+  }
+  const response = await apiFetch("/api/carrito/items", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ productoId, cantidad })
+  });
+  if (response.status === 401) {
+    irALoginDesdeAqui();
+    return null;
+  }
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.success) throw new Error(data?.message || "No se pudo agregar al carrito.");
+  renderPanelCarrito(data.carrito);
+  abrirCarrito();
+  return data.carrito;
+}
+
+async function cambiarCantidadCarrito(productoId, cantidad) {
+  const response = await apiFetch(`/api/carrito/items/${encodeURIComponent(productoId)}`, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ cantidad })
+  });
+  const data = await response.json().catch(() => null);
+  if (!response.ok || !data?.success) throw new Error(data?.message || "No se pudo actualizar el carrito.");
+  renderPanelCarrito(data.carrito);
+  document.dispatchEvent(new CustomEvent("carrito:actualizado", { detail: data.carrito }));
+  return data.carrito;
+}
+
+function abrirCarrito() {
+  const panel = document.getElementById("carritoPanel");
+  if (!panel || typeof bootstrap === "undefined") return;
+  if (!localStorage.getItem("fluxg_token")) renderPanelCarrito(null);
+  bootstrap.Offcanvas.getOrCreateInstance(panel).show();
+}
+
+function actualizarContadorCarrito(carrito) {
+  const badge = document.getElementById("navbar-cart-count");
+  if (!badge) return;
+  const n = carrito?.cantidadArticulos || 0;
+  badge.textContent = n > 99 ? "99+" : String(n);
+  badge.hidden = n === 0;
+}
+
+// HTML de las líneas del carrito; lo usan el panel lateral y carrito.html
+function lineasCarritoHtml(carrito, editable = true) {
+  return carrito.lineas.map(l => {
+    const esPlan = l.categoria === "PLAN";
+    const controles = editable ? `
+        <div class="cart-qty">
+          ${esPlan ? "" : `<button type="button" data-accion="menos" aria-label="Quitar uno"><i class="bi bi-dash"></i></button>
+          <span>${l.cantidad}</span>
+          <button type="button" data-accion="mas" aria-label="Agregar uno"${l.cantidad >= l.maxCantidad ? " disabled" : ""}><i class="bi bi-plus"></i></button>`}
+          <button type="button" class="cart-remove" data-accion="quitar">Quitar</button>
+        </div>` : `<span>Cantidad: ${l.cantidad}</span>`;
+    return `
+    <div class="cart-line" data-producto="${escapeHtml(l.productoId)}">
+      <div class="cart-line-icon"><i class="bi ${escapeHtml(l.icono)}"></i></div>
+      <div class="cart-line-info">
+        <strong>${escapeHtml(l.nombre)}</strong>
+        <span>${dinero(l.precio)} · ${escapeHtml(l.unidad)}</span>
+        ${controles}
+      </div>
+      <b class="cart-line-total">${dinero(l.importe)}</b>
+    </div>`;
+  }).join("");
+}
+
+// Conecta los botones +/−/quitar de un contenedor con líneas del carrito
+function conectarLineasCarrito(contenedor, carrito, alertBox) {
+  contenedor.querySelectorAll(".cart-line button[data-accion]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.closest(".cart-line").dataset.producto;
+      const linea = carrito.lineas.find(l => l.productoId === id);
+      if (!linea) return;
+      const accion = btn.dataset.accion;
+      const nueva = accion === "mas" ? linea.cantidad + 1 : accion === "menos" ? linea.cantidad - 1 : 0;
+      btn.disabled = true;
+      try {
+        await cambiarCantidadCarrito(id, nueva);
+      } catch (error) {
+        if (alertBox) showAlert(alertBox, "danger", escapeHtml(error.message));
+        btn.disabled = false;
+      }
+    });
+  });
+}
+
+function renderPanelCarrito(carrito) {
+  actualizarContadorCarrito(carrito);
+  const body = document.getElementById("carritoPanelBody");
+  if (!body) return;
+
+  if (!localStorage.getItem("fluxg_token")) {
+    const redirect = encodeURIComponent(window.location.pathname + window.location.search);
+    body.innerHTML = `
+      <div class="cart-empty">
+        <i class="bi bi-person-lock"></i>
+        <p>Inicia sesión para guardar productos en tu carrito.</p>
+        <a href="login.html?redirect=${redirect}" class="plan-button">INICIAR SESIÓN <i class="bi bi-arrow-up-right"></i></a>
+      </div>`;
+    return;
+  }
+
+  if (!carrito || carrito.lineas.length === 0) {
+    body.innerHTML = `
+      <div class="cart-empty">
+        <i class="bi bi-cart3"></i>
+        <p>Tu carrito está vacío.</p>
+        <a href="tienda.html" class="plan-button">IR A LA TIENDA <i class="bi bi-arrow-up-right"></i></a>
+      </div>`;
+    return;
+  }
+
+  body.innerHTML = `
+    <div id="carritoPanelAlert" class="d-none"></div>
+    <div class="cart-lines">${lineasCarritoHtml(carrito)}</div>
+    <div class="cart-summary">
+      <div class="cart-total"><span>TOTAL · IVA INCLUIDO</span><strong>${dinero(carrito.total)}</strong></div>
+      <a href="carrito.html" class="plan-button cart-checkout">IR A PAGAR <i class="bi bi-arrow-up-right"></i></a>
+      <a href="tienda.html" class="cart-continue">Seguir comprando</a>
+    </div>`;
+  const alertBox = document.getElementById("carritoPanelAlert");
+  if (carrito.avisos?.length) showAlert(alertBox, "info", carrito.avisos.map(escapeHtml).join("<br>"));
+  conectarLineasCarrito(body, carrito, alertBox);
 }
