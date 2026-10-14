@@ -16,11 +16,76 @@ const API_BASE = (window.location.hostname === "localhost" || window.location.ho
     localStorage.removeItem("fluxguard_active_subscription");
     localStorage.setItem("fluxg_v4_clean", "true");
   }
-  // En las páginas de login y registro nunca debe haber sesión activa preexistente
-  if (window.location.pathname.includes("login.html") || window.location.pathname.includes("crear-cuenta.html")) {
+  // Un "usuario" sin token de sesión viene de versiones anteriores (sin validación en el servidor): se descarta
+  if (!localStorage.getItem("fluxg_token")) {
     localStorage.removeItem("usuario");
   }
+  // En las páginas de login y registro nunca debe haber sesión activa preexistente
+  if (window.location.pathname.includes("login.html") || window.location.pathname.includes("crear-cuenta.html")) {
+    cerrarSesion();
+  }
 })();
+
+// ===== Sesión =====
+// El servidor entrega un token al iniciar sesión; "usuario" en localStorage es solo una copia para mostrar el nombre.
+// Las páginas protegidas confirman la sesión con /api/auth/me antes de mostrar datos.
+
+function guardarSesion(token, usuario) {
+  localStorage.setItem("fluxg_token", token);
+  localStorage.setItem("usuario", JSON.stringify(usuario));
+}
+
+function actualizarUsuario(usuario) {
+  localStorage.setItem("usuario", JSON.stringify(usuario));
+}
+
+function cerrarSesion() {
+  const token = localStorage.getItem("fluxg_token");
+  localStorage.removeItem("fluxg_token");
+  localStorage.removeItem("usuario");
+  if (token) {
+    fetch(`${API_BASE}/api/auth/logout`, { method: "POST", headers: { "Authorization": `Bearer ${token}` } }).catch(() => {});
+  }
+}
+
+// fetch con el token de sesión. Si el servidor responde 401, la sesión local se borra.
+async function apiFetch(path, options = {}) {
+  const token = localStorage.getItem("fluxg_token");
+  const headers = { ...(options.headers || {}) };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const response = await fetch(`${API_BASE}${path}`, { ...options, headers });
+  if (response.status === 401) {
+    localStorage.removeItem("fluxg_token");
+    localStorage.removeItem("usuario");
+  }
+  return response;
+}
+
+// Devuelve el usuario de la sesión validado por el servidor, o null si no hay sesión válida
+async function obtenerUsuarioSesion() {
+  if (!localStorage.getItem("fluxg_token")) return null;
+  try {
+    const response = await apiFetch("/api/auth/me");
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.success || !data.usuario) return null;
+    actualizarUsuario(data.usuario);
+    return data.usuario;
+  } catch (_) {
+    return null;
+  }
+}
+
+// Solo permite redirigir a páginas del mismo sitio (evita redirecciones a dominios externos o "javascript:")
+function rutaSegura(destino) {
+  if (!destino) return null;
+  try {
+    const url = new URL(destino, window.location.href);
+    if (url.origin !== window.location.origin) return null;
+    return url.pathname + url.search + url.hash;
+  } catch (_) {
+    return null;
+  }
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   initNavbar();
@@ -86,7 +151,7 @@ function initNavbarAuth() {
         </ul>
       </div>`;
     document.getElementById("btn-logout")?.addEventListener("click", () => {
-      localStorage.removeItem("usuario");
+      cerrarSesion();
       window.location.href = "index.html";
     });
   } catch {
@@ -467,7 +532,7 @@ function initAuthForms() {
 
     // Botón para limpiar todos los datos y correos en caché
     document.getElementById("btn-reset-cache")?.addEventListener("click", () => {
-      localStorage.removeItem("usuario");
+      cerrarSesion();
       localStorage.removeItem("fluxg_usuarios");
       localStorage.removeItem("fluxguard_active_subscription");
       showAlert(alertBox, "info", "Se han borrado todos los correos y sesiones guardadas. Ahora el sistema está completamente limpio.");
@@ -509,21 +574,12 @@ function initAuthForms() {
           throw new Error(escapeHtml(data?.message || "No se pudo iniciar sesión. Intenta de nuevo."));
         }
 
-        // Preservar suscripción existente si ya la tenía en localStorage
-        const prevUserRaw = localStorage.getItem("usuario");
-        if (prevUserRaw) {
-          try {
-            const prevUser = JSON.parse(prevUserRaw);
-            if (prevUser.correo === data.usuario.correo && prevUser.suscripcion) {
-              data.usuario.suscripcion = prevUser.suscripcion;
-            }
-          } catch (_) {}
-        }
+        // La suscripción viene del servidor junto con el usuario
+        guardarSesion(data.token, data.usuario);
 
-        localStorage.setItem("usuario", JSON.stringify(data.usuario));
-
-        if (redirect) {
-          window.location.href = decodeURIComponent(redirect);
+        const destino = rutaSegura(redirect);
+        if (destino) {
+          window.location.href = destino;
         } else if (solicitar === "prototipo" || plan === "prototipo") {
           window.location.href = "pago.html?plan=prototipo";
         } else if (solicitar === "plan" && plan) {

@@ -11,6 +11,7 @@ public class ApiResponse<T> {
     private T prospectos;
     private Boolean requiereVerificacion;
     private String correo;
+    private String token;
 
     public ApiResponse() {}
 
@@ -81,5 +82,13 @@ public class ApiResponse<T> {
 
     public void setCorreo(String correo) {
         this.correo = correo;
+    }
+
+    public String getToken() {
+        return token;
+    }
+
+    public void setToken(String token) {
+        this.token = token;
     }
 }

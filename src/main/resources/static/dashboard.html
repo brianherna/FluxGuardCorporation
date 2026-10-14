@@ -472,25 +472,10 @@
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
   <script src="js/main.js"></script>
   <script>
-    document.addEventListener("DOMContentLoaded", () => {
-      // 1. Proteger acceso: requerir sesión iniciada
-      const rawUser = localStorage.getItem("usuario");
-      if (!rawUser) {
-        window.location.href = "login.html?redirect=dashboard.html";
-        return;
-      }
-
-      let user = {};
-      try {
-        user = JSON.parse(rawUser);
-      } catch (_) {
-        localStorage.removeItem("usuario");
-        window.location.href = "login.html";
-        return;
-      }
-
+    document.addEventListener("DOMContentLoaded", async () => {
+      // 1. Proteger acceso: la sesión se valida en el servidor, no solo en localStorage
+      const user = await obtenerUsuarioSesion();
       if (!user || !user.correo) {
-        localStorage.removeItem("usuario");
         window.location.href = "login.html?redirect=dashboard.html";
         return;
       }
@@ -513,12 +498,14 @@
       document.getElementById("dropdown-plan-badge").innerHTML = `<i class="bi bi-stars me-1"></i> ${sub.plan}`;
       document.getElementById("dash-circuits-count").innerHTML = `<i class="bi bi-diagram-3-fill text-warning me-1"></i> ${sub.circuitos} Circuitos Habilitados`;
       document.getElementById("badge-circuit-slots").textContent = `${sub.circuitos} / ${sub.circuitos} Circuitos Asignados`;
-      document.getElementById("dash-period-info").innerHTML = `<i class="bi bi-calendar-check-fill text-info me-1"></i> Renovación: ${sub.proximoCobro || "Próximo mes"}`;
-      document.getElementById("dash-trans-id").innerHTML = `<i class="bi bi-receipt text-success me-1"></i> ${sub.transaccionId || "FLX-849201"}`;
+      // El servidor manda fechas como "2026-10-14"; se muestran en formato local
+      const fecha = valor => valor ? new Date(`${valor}T00:00:00`).toLocaleDateString("es-MX") : "Próximo mes";
+      document.getElementById("dash-period-info").innerHTML = `<i class="bi bi-calendar-check-fill text-info me-1"></i> Renovación: ${escapeHtml(fecha(sub.proximoCobro))}`;
+      document.getElementById("dash-trans-id").innerHTML = `<i class="bi bi-receipt text-success me-1"></i> ${escapeHtml(sub.transaccionId || "")}`;
 
       // Logout
       document.getElementById("btn-dash-logout")?.addEventListener("click", () => {
-        localStorage.removeItem("usuario");
+        cerrarSesion();
         window.location.href = "index.html";
       });
 

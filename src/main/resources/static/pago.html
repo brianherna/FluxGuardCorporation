@@ -272,7 +272,7 @@
       initCheckoutPage();
     });
 
-    function initCheckoutPage() {
+    async function initCheckoutPage() {
       const params = new URLSearchParams(window.location.search);
       const plan = (params.get("plan") || "standard").toLowerCase();
 
@@ -349,7 +349,8 @@
         }
       };
 
-      const selected = planesConfig[plan] || planesConfig.standard;
+      const tipoPlan = planesConfig[plan] ? plan : "standard";
+      const selected = planesConfig[tipoPlan];
 
       // Actualizar DOM
       document.getElementById("plan-name-badge").textContent = selected.badge;
@@ -369,51 +370,55 @@
         </div>
       `).join("");
 
-      // Requerir sesión previa o redirigir
-      const rawUser = localStorage.getItem("usuario");
-      if (!rawUser) {
-        window.location.href = `login.html?solicitar=plan&plan=${plan}&redirect=${encodeURIComponent(window.location.href)}`;
+      // Requerir una sesión válida en el servidor o redirigir al login
+      const irALogin = () => {
+        window.location.href = `login.html?solicitar=plan&plan=${tipoPlan}&redirect=${encodeURIComponent(window.location.href)}`;
+      };
+      const userObj = await obtenerUsuarioSesion();
+      if (!userObj) {
+        irALogin();
         return;
       }
-
-      let userObj = {};
-      try {
-        userObj = JSON.parse(rawUser);
-        const fullName = `${userObj.nombre || "Usuario"} ${userObj.apellido || ""}`.trim();
-        document.getElementById("user-display-name").textContent = fullName;
-        document.getElementById("user-display-email").textContent = userObj.correo || "";
-      } catch (_) {
-        window.location.href = `login.html?solicitar=plan&plan=${plan}&redirect=${encodeURIComponent(window.location.href)}`;
-        return;
-      }
+      const fullName = `${userObj.nombre || "Usuario"} ${userObj.apellido || ""}`.trim();
+      document.getElementById("user-display-name").textContent = fullName;
+      document.getElementById("user-display-email").textContent = userObj.correo || "";
 
       // Acción de activación
       const alertBox = document.getElementById("checkout-alert");
       const payButton = document.getElementById("btn-submit-payment");
 
-      payButton.addEventListener("click", () => {
+      payButton.addEventListener("click", async () => {
+        const textoOriginal = payButton.innerHTML;
         payButton.disabled = true;
         payButton.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> ACTIVANDO TU MONITOREO...`;
 
-        setTimeout(() => {
-          userObj.suscripcion = {
-            plan: selected.name,
-            tipo: plan,
-            precio: selected.price,
-            estado: "Activa",
-            circuitos: plan === "free" ? 1 : (plan === "ultimate" ? 12 : 5),
-            fechaInicio: new Date().toLocaleDateString("es-MX"),
-            proximoCobro: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString("es-MX"),
-            transaccionId: "FLX-" + Math.floor(100000 + Math.random() * 900000)
-          };
-          localStorage.setItem("usuario", JSON.stringify(userObj));
+        try {
+          // La suscripción se guarda en el servidor (MongoDB); el precio y los circuitos los decide el backend
+          const response = await apiFetch("/api/suscripcion", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ plan: tipoPlan })
+          });
+          if (response.status === 401) {
+            irALogin();
+            return;
+          }
+          const data = await response.json().catch(() => null);
+          if (!response.ok || !data?.success || !data.usuario) {
+            throw new Error(data?.message || "No se pudo activar tu plan. Intenta de nuevo.");
+          }
+          actualizarUsuario(data.usuario);
 
           showAlert(alertBox, "success", "<strong>¡Servicio activado con éxito!</strong> Tu plan de monitoreo ha quedado vinculado a tu cuenta. Redirigiendo a tu Dashboard de Monitoreo...");
 
           setTimeout(() => {
             window.location.href = "dashboard.html";
           }, 1200);
-        }, 1200);
+        } catch (error) {
+          showAlert(alertBox, "danger", escapeHtml(error.message || "No se pudo conectar con el servidor."));
+          payButton.disabled = false;
+          payButton.innerHTML = textoOriginal;
+        }
       });
     }
 

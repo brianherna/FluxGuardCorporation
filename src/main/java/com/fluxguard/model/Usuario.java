@@ -27,6 +27,8 @@ public class Usuario {
     private LocalDateTime tokenExpira;
     private LocalDateTime tokenEnviadoEn;
 
+    private Suscripcion suscripcion;
+
     public Usuario() {
         this.fechaRegistro = LocalDateTime.now();
     }
@@ -122,5 +124,13 @@ public class Usuario {
 
     public void setTokenEnviadoEn(LocalDateTime tokenEnviadoEn) {
         this.tokenEnviadoEn = tokenEnviadoEn;
+    }
+
+    public Suscripcion getSuscripcion() {
+        return suscripcion;
+    }
+
+    public void setSuscripcion(Suscripcion suscripcion) {
+        this.suscripcion = suscripcion;
     }
 }

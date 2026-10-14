@@ -4,6 +4,8 @@ import com.fluxguard.dto.ApiResponse;
 import com.fluxguard.dto.ProspectoRequest;
 import com.fluxguard.model.Prospecto;
 import com.fluxguard.repository.ProspectoRepository;
+import com.fluxguard.service.Tokens;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -13,15 +15,17 @@ import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/prospectos")
-@CrossOrigin(origins = "*")
 public class ProspectoController {
 
     private final ProspectoRepository prospectoRepository;
-    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@(.+)$");
+    private final String adminApiKey;
+    private static final Pattern EMAIL_PATTERN = Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
     private static final Pattern PHONE_PATTERN = Pattern.compile("^[0-9+\\-()\\s]{7,30}$");
 
-    public ProspectoController(ProspectoRepository prospectoRepository) {
+    public ProspectoController(ProspectoRepository prospectoRepository,
+                               @Value("${app.admin-api-key:${ADMIN_API_KEY:}}") String adminApiKey) {
         this.prospectoRepository = prospectoRepository;
+        this.adminApiKey = adminApiKey.trim();
     }
 
     @PostMapping
@@ -69,8 +73,15 @@ public class ProspectoController {
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 
+    /** Contiene datos personales: solo responde con el encabezado X-Admin-Key igual a ADMIN_API_KEY. */
     @GetMapping
-    public ResponseEntity<ApiResponse<List<Prospecto>>> obtenerProspectos() {
+    public ResponseEntity<ApiResponse<List<Prospecto>>> obtenerProspectos(
+            @RequestHeader(value = "X-Admin-Key", required = false) String clave) {
+        if (adminApiKey.isEmpty() || clave == null || !Tokens.iguales(clave, adminApiKey)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(ApiResponse.error("No tienes permiso para consultar los prospectos."));
+        }
+
         List<Prospecto> lista = prospectoRepository.findAllByOrderByFechaRegistroDesc();
         ApiResponse<List<Prospecto>> response = ApiResponse.ok("Prospectos obtenidos");
         response.setProspectos(lista);
