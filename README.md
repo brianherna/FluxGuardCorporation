@@ -1,5 +1,7 @@
 # FluxGuard
 
+Entra a la pagina con el siguiente link: https://fluxguardcorporation.onrender.com
+
 Plataforma web de monitoreo eléctrico IoT. Backend en Spring Boot 3.5 (Java 17) con MongoDB Atlas; el frontend estático se sirve desde `src/main/resources/static`.
 
 ## Configuración
