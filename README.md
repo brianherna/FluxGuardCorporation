@@ -16,6 +16,9 @@ Plataforma web de monitoreo eléctrico IoT. Backend en Spring Boot 3.5 (Java 17)
 | `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME` | Envío del correo de verificación. Sin clave, el enlace se imprime en la consola |
 | `CORS_ALLOWED_ORIGINS` | Dominios extra que pueden llamar a la API (separados por coma) |
 | `ADMIN_API_KEY` | Clave para `GET /api/prospectos` (encabezado `X-Admin-Key`). Vacía = deshabilitado |
+| `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | Credenciales de la app de PayPal (pestaña Sandbox para pruebas) |
+| `PAYPAL_MODE` | `sandbox` (pagos de prueba, por defecto) o `live` (pagos reales) |
+| `PAYPAL_CURRENCY` | Moneda de cobro, por defecto `MXN` |
 
 En Render, define las mismas variables en el panel del servicio.
 
@@ -41,14 +44,34 @@ docker build -t fluxguard . && docker run --env-file .env -p 8080:8080 fluxguard
 | POST | `/api/auth/login` | Devuelve el usuario y un token de sesión (7 días) |
 | GET | `/api/auth/me` | Usuario de la sesión (`Authorization: Bearer <token>`) |
 | POST | `/api/auth/logout` | Cierra la sesión |
-| POST | `/api/suscripcion` | Activa un plan (`free`, `standard`, `ultimate`, `prototipo`) para la sesión |
 | GET | `/api/catalogo` | Productos de la tienda (precios en MXN con IVA) |
 | GET | `/api/carrito` | Carrito de la sesión |
 | POST | `/api/carrito/items` | Agrega un producto (`productoId`, `cantidad`) |
 | PUT / DELETE | `/api/carrito/items/{productoId}` | Cambia la cantidad o quita el producto |
-| POST | `/api/carrito/comprar` | Crea el pedido, activa el plan incluido y vacía el carrito |
+| POST | `/api/carrito/comprar` | Crea el pedido pendiente y devuelve `urlPago` (PayPal) |
+| GET | `/api/pedidos/{folio}` | Estado de un pedido del usuario |
+| POST | `/api/pedidos/{folio}/confirmar?token=` | Cobra la orden aprobada en PayPal; si se completa activa el plan y vacía el carrito |
+| POST | `/api/pedidos/{folio}/cancelar` | Marca el pedido como cancelado (el carrito se conserva) |
 | POST | `/api/prospectos` | Guarda el formulario de contacto |
 | GET | `/api/prospectos` | Lista prospectos (requiere `X-Admin-Key`) |
 | GET | `/api/health` | Estado del servicio |
 
-> El pago todavía es una activación sin cobro real: falta integrar una pasarela de pago.
+## Pagos con PayPal Sandbox (modo de prueba)
+
+Los pagos usan PayPal Sandbox: el flujo es igual al real pero con cuentas ficticias, sin dinero real.
+
+1. Entra a https://developer.paypal.com con tu cuenta de PayPal y abre **Apps & Credentials** (pestaña **Sandbox**).
+2. Crea una app (tipo *Merchant*) y copia **Client ID** y **Secret** a `PAYPAL_CLIENT_ID` y `PAYPAL_CLIENT_SECRET` en tu `.env`.
+3. En **Testing Tools > Sandbox Accounts** hay una cuenta *Business* (la que recibe) y una *Personal* (la compradora).
+   Para cobrar en MXN, la cuenta Business de prueba debe ser de **México**; si la tuya es de otro país, crea una nueva Business con país México y crea la app con ella.
+4. En la tienda, al pagar te lleva a PayPal: inicia sesión con el correo y contraseña de la cuenta **Personal** de prueba
+   (se ven en *Sandbox Accounts > View/Edit account*). Al aprobar regresas a `carrito.html` y el pedido queda pagado.
+
+El cobro se confirma cuando el cliente regresa a la página, así que funciona en `localhost` sin configurar webhooks.
+
+### Compras sin cuenta (invitado)
+
+El carrito y el pago funcionan sin iniciar sesión: el navegador genera un token de invitado (encabezado `X-Carrito-Invitado`)
+y el carrito se guarda con ese token. Los invitados pueden comprar el kit, accesorios y garantía; los **planes** requieren
+cuenta porque se activan en ella. El nombre y correo del invitado se toman de su cuenta de PayPal al cobrar.
+Si el invitado inicia sesión, su carrito pasa a la cuenta (`POST /api/carrito/fusionar`).

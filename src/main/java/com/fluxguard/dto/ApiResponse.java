@@ -19,6 +19,7 @@ public class ApiResponse<T> {
     private CarritoDto carrito;
     private Pedido pedido;
     private List<Producto> productos;
+    private String urlPago;
 
     public ApiResponse() {}
 
@@ -121,5 +122,13 @@ public class ApiResponse<T> {
 
     public void setProductos(List<Producto> productos) {
         this.productos = productos;
+    }
+
+    public String getUrlPago() {
+        return urlPago;
+    }
+
+    public void setUrlPago(String urlPago) {
+        this.urlPago = urlPago;
     }
 }

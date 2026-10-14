@@ -2,9 +2,7 @@ package com.fluxguard;
 
 import com.fluxguard.controller.AuthController;
 import com.fluxguard.controller.ProspectoController;
-import com.fluxguard.controller.SuscripcionController;
 import com.fluxguard.dto.LoginRequest;
-import com.fluxguard.dto.SuscripcionRequest;
 import com.fluxguard.model.Sesion;
 import com.fluxguard.model.Usuario;
 import com.fluxguard.repository.ProspectoRepository;
@@ -92,27 +90,6 @@ class ControladoresTests {
         assertTrue(sesionService.usuarioDesde("Bearer " + token).isEmpty());
         assertTrue(sesionService.usuarioDesde(token).isEmpty());
         assertTrue(sesionService.usuarioDesde(null).isEmpty());
-    }
-
-    @Test
-    void suscripcionRequiereSesionYPlanValido() {
-        SuscripcionController controller = new SuscripcionController(usuarioRepository, sesionService, new com.fluxguard.service.SuscripcionService());
-        SuscripcionRequest request = new SuscripcionRequest();
-        request.setPlan("ultimate");
-
-        assertEquals(HttpStatus.UNAUTHORIZED, controller.activar(null, request).getStatusCode());
-
-        String token = Tokens.nuevo();
-        when(sesionRepository.findByTokenHash(Tokens.sha256(token))).thenReturn(Optional.of(
-                new Sesion(Tokens.sha256(token), "u1", LocalDateTime.now(), LocalDateTime.now().plusDays(1))));
-        when(usuarioRepository.findById("u1")).thenReturn(Optional.of(usuarioVerificado()));
-
-        var activada = controller.activar("Bearer " + token, request);
-        assertEquals(HttpStatus.OK, activada.getStatusCode());
-        assertEquals(12, activada.getBody().getUsuario().getSuscripcion().getCircuitos());
-
-        request.setPlan("gratis-para-siempre");
-        assertEquals(HttpStatus.BAD_REQUEST, controller.activar("Bearer " + token, request).getStatusCode());
     }
 
     @Test
