@@ -42,6 +42,11 @@ docker build -t fluxguard . && docker run --env-file .env -p 8080:8080 fluxguard
 | GET | `/api/auth/me` | Usuario de la sesión (`Authorization: Bearer <token>`) |
 | POST | `/api/auth/logout` | Cierra la sesión |
 | POST | `/api/suscripcion` | Activa un plan (`free`, `standard`, `ultimate`, `prototipo`) para la sesión |
+| GET | `/api/catalogo` | Productos de la tienda (precios en MXN con IVA) |
+| GET | `/api/carrito` | Carrito de la sesión |
+| POST | `/api/carrito/items` | Agrega un producto (`productoId`, `cantidad`) |
+| PUT / DELETE | `/api/carrito/items/{productoId}` | Cambia la cantidad o quita el producto |
+| POST | `/api/carrito/comprar` | Crea el pedido, activa el plan incluido y vacía el carrito |
 | POST | `/api/prospectos` | Guarda el formulario de contacto |
 | GET | `/api/prospectos` | Lista prospectos (requiere `X-Admin-Key`) |
 | GET | `/api/health` | Estado del servicio |

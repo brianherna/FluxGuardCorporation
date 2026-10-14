@@ -96,7 +96,7 @@ class ControladoresTests {
 
     @Test
     void suscripcionRequiereSesionYPlanValido() {
-        SuscripcionController controller = new SuscripcionController(usuarioRepository, sesionService);
+        SuscripcionController controller = new SuscripcionController(usuarioRepository, sesionService, new com.fluxguard.service.SuscripcionService());
         SuscripcionRequest request = new SuscripcionRequest();
         request.setPlan("ultimate");
 

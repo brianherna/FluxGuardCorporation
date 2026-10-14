@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FluxGuard — Tu carrito</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,400;0,500;0,600;0,700;0,800;0,900;1,700;1,900&family=DM+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="plans-page shop-page">
+
+  <!-- ================= NAVBAR ================= -->
+  <header class="navbar">
+    <a href="index.html#inicio" class="navbar-logo" aria-label="FluxGuard - Inicio">
+      <img src="assets/fluxguard-logo-full.png" class="navbar-logo-image" alt="FluxGuard">
+    </a>
+
+    <nav class="navbar-links" id="navbarMenu">
+      <a href="index.html#inicio">Inicio</a>
+      <a href="planes.html">Planes</a>
+      <a href="tienda.html">Tienda</a>
+      <a href="contacto.html">Contacto</a>
+    </nav>
+
+    <div class="navbar-actions" id="navbar-auth-action">
+      <a href="login.html" class="navbar-panel">
+        Iniciar sesión <i class="bi bi-arrow-up-right"></i>
+      </a>
+    </div>
+
+    <button type="button" class="navbar-mobile-toggle" id="navbarToggle" aria-label="Abrir menú">
+      <i class="bi bi-list fs-4"></i>
+    </button>
+  </header>
+
+  <div class="plans-background"></div>
+  <div class="plans-grid-noise"></div>
+
+  <main class="checkout-shell">
+    <span class="section-eyebrow"><span></span> FLUXGUARD / CONFIRMAR COMPRA</span>
+    <h1>Tu<br><em>carrito.</em></h1>
+
+    <div id="checkout-alert" class="d-none"></div>
+    <div class="checkout-box" id="checkout-box">
+      <div class="text-center py-4"><span class="spinner-border spinner-border-sm me-2"></span> Cargando tu carrito...</div>
+    </div>
+  </main>
+
+  <footer class="plans-footer">
+    <span>FLUXGUARD / MONITOREA HOY, PROTEGE MAÑANA</span>
+    <a href="tienda.html">SEGUIR COMPRANDO <i class="bi bi-arrow-up-right"></i></a>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="js/main.js"></script>
+  <script>
+    document.addEventListener("DOMContentLoaded", initCheckoutCarrito);
+    // Si el carrito cambia desde el panel lateral, se vuelve a dibujar el resumen
+    document.addEventListener("carrito:actualizado", event => renderResumen(event.detail));
+
+    async function initCheckoutCarrito() {
+      const usuario = await obtenerUsuarioSesion();
+      if (!usuario) {
+        window.location.href = "login.html?redirect=carrito.html";
+        return;
+      }
+      try {
+        renderResumen(await cargarCarrito());
+      } catch (error) {
+        document.getElementById("checkout-box").innerHTML = `<p class="m-0">${escapeHtml(error.message)}</p>`;
+      }
+    }
+
+    function renderResumen(carrito) {
+      const box = document.getElementById("checkout-box");
+      const alertBox = document.getElementById("checkout-alert");
+      if (!carrito || carrito.lineas.length === 0) {
+        box.innerHTML = `
+          <div class="cart-empty py-4">
+            <i class="bi bi-cart3"></i>
+            <p>Tu carrito está vacío.</p>
+            <a href="tienda.html" class="plan-button d-inline-flex">IR A LA TIENDA <i class="bi bi-arrow-up-right ms-2"></i></a>
+          </div>`;
+        return;
+      }
+
+      box.innerHTML = `
+        <div class="cart-lines">${lineasCarritoHtml(carrito)}</div>
+        <div class="cart-total"><span>TOTAL · IVA INCLUIDO</span><strong>${dinero(carrito.total)}</strong></div>
+        <button type="button" class="plan-button cart-checkout w-100" id="btn-confirmar-compra">
+          CONFIRMAR COMPRA <i class="bi bi-arrow-up-right"></i>
+        </button>
+        <p class="checkout-note">
+          <i class="bi bi-info-circle me-1"></i> Pago de demostración: el pedido se registra sin realizar un cobro real.
+          Si incluye un plan, se activa en tu cuenta al confirmar.
+        </p>`;
+      if (carrito.avisos?.length) showAlert(alertBox, "info", carrito.avisos.map(escapeHtml).join("<br>"));
+      conectarLineasCarrito(box, carrito, alertBox);
+      document.getElementById("btn-confirmar-compra").addEventListener("click", confirmarCompra);
+    }
+
+    async function confirmarCompra(event) {
+      const boton = event.currentTarget;
+      const alertBox = document.getElementById("checkout-alert");
+      boton.disabled = true;
+      boton.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> PROCESANDO...`;
+      try {
+        const response = await apiFetch("/api/carrito/comprar", { method: "POST" });
+        if (response.status === 401) {
+          window.location.href = "login.html?redirect=carrito.html";
+          return;
+        }
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data?.success) {
+          // El servidor pudo ajustar el carrito: se vuelve a cargar antes de mostrar el error
+          renderResumen(await cargarCarrito());
+          throw new Error(data?.message || "No se pudo confirmar la compra.");
+        }
+        actualizarUsuario(data.usuario);
+        renderPanelCarrito({ lineas: [], total: 0, cantidadArticulos: 0 });
+        mostrarExito(data.pedido, data.usuario);
+      } catch (error) {
+        showAlert(alertBox, "danger", escapeHtml(error.message));
+        boton.disabled = false;
+        boton.innerHTML = `CONFIRMAR COMPRA <i class="bi bi-arrow-up-right"></i>`;
+      }
+    }
+
+    function mostrarExito(pedido, usuario) {
+      document.getElementById("checkout-alert").classList.add("d-none");
+      document.getElementById("checkout-box").innerHTML = `
+        <div class="checkout-success">
+          <i class="bi bi-check2-circle"></i>
+          <h2>¡Compra confirmada!</h2>
+          <p class="text-white-50 mb-4">Folio <strong class="text-white">${escapeHtml(pedido.folio)}</strong> · Total ${dinero(pedido.total)}</p>
+          <div class="cart-lines text-start mb-4">${pedido.lineas.map(l => `
+            <div class="cart-line" style="grid-template-columns:1fr auto">
+              <div class="cart-line-info"><strong>${escapeHtml(l.nombre)}</strong><span>${l.cantidad} × ${dinero(l.precioUnitario)}</span></div>
+              <b class="cart-line-total">${dinero(l.importe)}</b>
+            </div>`).join("")}
+          </div>
+          ${usuario?.suscripcion ? `<a href="dashboard.html" class="plan-button cart-checkout">IR A MI DASHBOARD <i class="bi bi-arrow-up-right ms-2"></i></a>` : ""}
+          <a href="tienda.html" class="plan-button">SEGUIR COMPRANDO <i class="bi bi-arrow-up-right ms-2"></i></a>
+        </div>`;
+    }
+  </script>
+</body>
+</html>

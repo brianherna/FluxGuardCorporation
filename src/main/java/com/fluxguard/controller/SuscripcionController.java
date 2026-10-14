@@ -3,17 +3,14 @@ package com.fluxguard.controller;
 import com.fluxguard.dto.ApiResponse;
 import com.fluxguard.dto.SuscripcionRequest;
 import com.fluxguard.dto.UsuarioDto;
-import com.fluxguard.model.Suscripcion;
 import com.fluxguard.model.Usuario;
 import com.fluxguard.repository.UsuarioRepository;
 import com.fluxguard.service.SesionService;
+import com.fluxguard.service.SuscripcionService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.security.SecureRandom;
-import java.time.LocalDate;
-import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -25,22 +22,15 @@ import java.util.Optional;
 @RequestMapping("/api/suscripcion")
 public class SuscripcionController {
 
-    private record Plan(String nombre, String precio, int circuitos) {}
-
-    private static final Map<String, Plan> PLANES = Map.of(
-            "free", new Plan("Plan Free", "0", 1),
-            "standard", new Plan("Plan Standard", "499", 5),
-            "ultimate", new Plan("Plan Ultimate", "1,499", 12),
-            "prototipo", new Plan("Prototipo Piloto", "350", 5)
-    );
-
     private final UsuarioRepository usuarioRepository;
     private final SesionService sesionService;
-    private final SecureRandom random = new SecureRandom();
+    private final SuscripcionService suscripcionService;
 
-    public SuscripcionController(UsuarioRepository usuarioRepository, SesionService sesionService) {
+    public SuscripcionController(UsuarioRepository usuarioRepository, SesionService sesionService,
+                                 SuscripcionService suscripcionService) {
         this.usuarioRepository = usuarioRepository;
         this.sesionService = sesionService;
+        this.suscripcionService = suscripcionService;
     }
 
     @PostMapping
@@ -54,18 +44,13 @@ public class SuscripcionController {
         }
 
         String tipo = request.getPlan() != null ? request.getPlan().trim().toLowerCase() : "";
-        Plan plan = PLANES.get(tipo);
-        if (plan == null) {
+        if (!suscripcionService.existe(tipo)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ApiResponse.error("El plan seleccionado no existe."));
         }
 
-        LocalDate hoy = LocalDate.now();
         Usuario usuario = optionalUsuario.get();
-        usuario.setSuscripcion(new Suscripcion(
-                plan.nombre(), tipo, plan.precio(), "Activa", plan.circuitos(),
-                hoy, hoy.plusMonths(1), "FLX-" + (100000 + random.nextInt(900000))
-        ));
+        suscripcionService.activar(usuario, tipo);
         Usuario guardado = usuarioRepository.save(usuario);
 
         ApiResponse<UsuarioDto> response = ApiResponse.ok("Suscripción activada");
