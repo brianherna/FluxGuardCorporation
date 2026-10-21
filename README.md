@@ -14,6 +14,7 @@ Plataforma web de monitoreo eléctrico IoT. Backend en Spring Boot 3.5 (Java 17)
 | `MONGODB_URI`, `MONGODB_DATABASE` | Conexión a MongoDB Atlas |
 | `APP_BASE_URL` | URL pública; se usa en el enlace del correo de verificación |
 | `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME` | Envío del correo de verificación. Sin clave, el enlace se imprime en la consola |
+| `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | Alternativa a Brevo: si `RESEND_API_KEY` tiene valor, los correos se envían con Resend. `RESEND_FROM_EMAIL` vacío usa `BREVO_SENDER_EMAIL` |
 | `CORS_ALLOWED_ORIGINS` | Dominios extra que pueden llamar a la API (separados por coma) |
 | `ADMIN_API_KEY` | Clave para `GET /api/prospectos` (encabezado `X-Admin-Key`). Vacía = deshabilitado |
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | Credenciales de la app de PayPal (pestaña Sandbox para pruebas) |

@@ -9,6 +9,8 @@ import com.fluxguard.repository.ProspectoRepository;
 import com.fluxguard.repository.SesionRepository;
 import com.fluxguard.repository.UsuarioRepository;
 import com.fluxguard.service.BrevoEmailService;
+import com.fluxguard.service.CorreoService;
+import com.fluxguard.service.ResendEmailService;
 import com.fluxguard.service.SesionService;
 import com.fluxguard.service.Tokens;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,7 +42,7 @@ class ControladoresTests {
         when(usuarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
         sesionService = new SesionService(sesionRepository, usuarioRepository);
         authController = new AuthController(usuarioRepository, encoder,
-                new BrevoEmailService("", "", "FluxGuard"), sesionService, "http://localhost:8080");
+                new CorreoService(new ResendEmailService("", "", "FluxGuard"), new BrevoEmailService("", "", "FluxGuard")), sesionService, "http://localhost:8080");
     }
 
     private Usuario usuarioVerificado() {
