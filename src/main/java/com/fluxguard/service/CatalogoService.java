@@ -7,7 +7,7 @@ import org.springframework.stereotype.Service;
 import java.util.List;
 import java.util.Optional;
 
-/** Catálogo de la tienda. Para cambiar un precio o agregar un producto, edita esta lista. */
+/** Catálogo de la tienda. Para cambiar un precio, el stock o la garantía de un producto, edita esta lista. */
 @Service
 public class CatalogoService {
 
@@ -16,33 +16,51 @@ public class CatalogoService {
     private static final List<Producto> PRODUCTOS = List.of(
             new Producto(KIT_PILOTO, "Kit Piloto FluxGuard",
                     "Microcontrolador con sensor de corriente no invasivo, conexión WiFi/MQTT y dashboard activado.",
-                    Categoria.PROTOTIPO, 350, "PAGO ÚNICO", "bi-cpu", false, 10),
+                    Categoria.PROTOTIPO, 350, "PAGO ÚNICO", "bi-cpu", false, 10,
+                    24, "Garantía de 1 año incluida"),
             new Producto("carcasa-personalizada", "Carcasa personalizada",
                     "Carcasa impresa en 3D con el color y el logo de tu empresa.",
-                    Categoria.PERSONALIZACION, 180, "POR KIT", "bi-box-seam", true, 10),
+                    Categoria.PERSONALIZACION, 180, "POR KIT", "bi-box-seam", true, 10,
+                    30, "Garantía de 6 meses incluida"),
             new Producto("pantalla-oled", "Pantalla OLED integrada",
                     "Muestra voltaje, corriente y consumo directamente en el equipo.",
-                    Categoria.PERSONALIZACION, 150, "POR KIT", "bi-display", true, 10),
+                    Categoria.PERSONALIZACION, 150, "POR KIT", "bi-display", true, 10,
+                    12, "Garantía de 1 año incluida"),
             new Producto("bateria-respaldo", "Batería de respaldo",
                     "Mantiene el monitoreo y el registro de datos aunque se vaya la luz.",
-                    Categoria.PERSONALIZACION, 200, "POR KIT", "bi-battery-charging", true, 10),
+                    Categoria.PERSONALIZACION, 200, "POR KIT", "bi-battery-charging", true, 10,
+                    5, "Garantía de 6 meses incluida"),
             new Producto("garantia-12m", "Garantía extendida 12 meses",
                     "Reemplazo del hardware del kit por fallas de fabricación durante un año adicional.",
-                    Categoria.SERVICIO, 250, "POR KIT", "bi-shield-check", true, 10),
+                    Categoria.SERVICIO, 250, "POR KIT", "bi-shield-check", true, 10,
+                    null, "Extiende la garantía del kit a 2 años"),
             new Producto("plan-free", "Plan Free",
                     "Monitoreo básico de 1 circuito con historial de 7 días.",
-                    Categoria.PLAN, 0, "GRATIS", "bi-lightning-charge", false, 1),
+                    Categoria.PLAN, 0, "GRATIS", "bi-lightning-charge", false, 1,
+                    null, null),
             new Producto("plan-standard", "Plan Standard",
                     "Hasta 5 circuitos, alertas automáticas, reportes PDF/CSV y 12 meses de historial.",
-                    Categoria.PLAN, 499, "MXN / MES", "bi-graph-up-arrow", false, 1)
+                    Categoria.PLAN, 499, "MXN / MES", "bi-graph-up-arrow", false, 1,
+                    null, null)
     );
 
+    private final List<Producto> productos;
+
+    public CatalogoService() {
+        this(PRODUCTOS);
+    }
+
+    /** Para pruebas con un catálogo distinto (p. ej. productos agotados). */
+    public CatalogoService(List<Producto> productos) {
+        this.productos = List.copyOf(productos);
+    }
+
     public List<Producto> todos() {
-        return PRODUCTOS;
+        return productos;
     }
 
     public Optional<Producto> buscar(String id) {
-        return PRODUCTOS.stream().filter(p -> p.id().equals(id)).findFirst();
+        return productos.stream().filter(p -> p.id().equals(id)).findFirst();
     }
 
     /** Tipo de suscripción que activa un plan del catálogo ("plan-standard" → "standard"). */
