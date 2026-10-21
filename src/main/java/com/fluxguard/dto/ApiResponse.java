@@ -20,6 +20,7 @@ public class ApiResponse<T> {
     private Pedido pedido;
     private List<Producto> productos;
     private String urlPago;
+    private List<String> metodosPago;
 
     public ApiResponse() {}
 
@@ -130,5 +131,13 @@ public class ApiResponse<T> {
 
     public void setUrlPago(String urlPago) {
         this.urlPago = urlPago;
+    }
+
+    public List<String> getMetodosPago() {
+        return metodosPago;
+    }
+
+    public void setMetodosPago(List<String> metodosPago) {
+        this.metodosPago = metodosPago;
     }
 }

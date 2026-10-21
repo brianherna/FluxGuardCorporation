@@ -5,19 +5,25 @@ import com.fluxguard.repository.PedidoRepository;
 import com.fluxguard.repository.UsuarioRepository;
 import com.fluxguard.service.PayPalService.Captura;
 import com.fluxguard.service.PayPalService.Orden;
+import com.fluxguard.service.StripeService.Sesion;
+import com.fluxguard.service.StripeService.SesionPago;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
- * Flujo de pago con PayPal:
- * 1. iniciar(): crea el pedido PENDIENTE y la orden de PayPal; el navegador va a PayPal a aprobar el pago.
- * 2. PayPal regresa al cliente a carrito.html?pedido=FOLIO&token=ORDEN y confirmar() cobra la orden.
- *    Si el cobro se completa y el monto coincide, el pedido pasa a PAGADO, se activa el plan y se vacía el carrito.
- * Si el cliente aprueba pero nunca regresa, la orden no se cobra: PayPal solo cobra al capturar.
+ * Flujo de pago (PayPal o tarjeta con Stripe):
+ * 1. iniciar(): crea el pedido PENDIENTE y la orden de PayPal o la sesión de Stripe; el navegador va a pagar ahí.
+ * 2. El proveedor regresa al cliente a carrito.html?pedido=FOLIO&token=REFERENCIA y confirmar() comprueba el pago:
+ *    - PayPal: cobra (captura) la orden aprobada. Si el cliente no regresa, no se cobra nada.
+ *    - Stripe: el cobro ya ocurrió en su página; se consulta la sesión. El webhook de Stripe hace lo mismo
+ *      por si el cliente cierra la ventana antes de regresar.
+ *    Si el pago está completo y el monto coincide, el pedido pasa a PAGADO, se activa el plan y se vacía el carrito.
  */
 @Service
 public class PagoService {
@@ -34,25 +40,44 @@ public class PagoService {
     }
 
     private final CarritoService carritoService;
+    public static final String PAYPAL = "paypal";
+    public static final String STRIPE = "stripe";
+
     private final PayPalService payPal;
+    private final StripeService stripe;
     private final PedidoRepository pedidoRepository;
     private final UsuarioRepository usuarioRepository;
     private final SuscripcionService suscripcionService;
 
-    public PagoService(CarritoService carritoService, PayPalService payPal, PedidoRepository pedidoRepository,
-                       UsuarioRepository usuarioRepository, SuscripcionService suscripcionService) {
+    public PagoService(CarritoService carritoService, PayPalService payPal, StripeService stripe,
+                       PedidoRepository pedidoRepository, UsuarioRepository usuarioRepository,
+                       SuscripcionService suscripcionService) {
         this.carritoService = carritoService;
         this.payPal = payPal;
+        this.stripe = stripe;
         this.pedidoRepository = pedidoRepository;
         this.usuarioRepository = usuarioRepository;
         this.suscripcionService = suscripcionService;
     }
 
-    /** Crea el pedido del carrito y la orden de PayPal. Un pedido de $0 (solo Plan Free) se completa sin cobro. */
-    public Inicio iniciar(Comprador comprador) {
+    /** Métodos de pago configurados en el servidor, para que carrito.html solo muestre los que funcionan. */
+    public List<String> metodosDisponibles() {
+        List<String> metodos = new ArrayList<>();
+        if (payPal.estaConfigurado()) metodos.add(PAYPAL);
+        if (stripe.estaConfigurado()) metodos.add(STRIPE);
+        return metodos;
+    }
+
+    /**
+     * Crea el pedido del carrito y el pago en el proveedor elegido ("paypal" o "stripe").
+     * Un pedido de $0 (solo Plan Free) se completa sin cobro.
+     */
+    public Inicio iniciar(Comprador comprador, String metodo) {
+        String elegido = STRIPE.equals(metodo) ? STRIPE : PAYPAL;
+        boolean disponible = STRIPE.equals(elegido) ? stripe.estaConfigurado() : payPal.estaConfigurado();
         // Se revisa antes de crear el pedido para no dejar pedidos pendientes que nadie puede pagar
-        if (!payPal.estaConfigurado() && carritoService.ver(comprador).total() > 0) {
-            throw new PagoNoDisponibleException("Los pagos no están disponibles en este momento. Intenta más tarde.");
+        if (!disponible && carritoService.ver(comprador).total() > 0) {
+            throw new PagoNoDisponibleException("Ese método de pago no está disponible en este momento. Intenta con otro.");
         }
 
         Pedido pedido = carritoService.crearPedido(comprador);
@@ -60,6 +85,15 @@ public class PagoService {
             pedido.setMetodoPago("sin_costo");
             completar(pedido);
             return new Inicio(pedido, null);
+        }
+
+        if (STRIPE.equals(elegido)) {
+            Sesion sesion = stripe.crearSesion(pedido);
+            pedido.setOrdenId(sesion.id());
+            pedido.setUrlPago(sesion.url());
+            pedido.setMetodoPago(stripe.esPrueba() ? "stripe_test" : "stripe");
+            pedidoRepository.save(pedido);
+            return new Inicio(pedido, sesion.url());
         }
 
         Orden orden = payPal.crearOrden(pedido);
@@ -71,15 +105,19 @@ public class PagoService {
     }
 
     /**
-     * Cobra la orden que el cliente aprobó en PayPal. Es idempotente: si el cliente recarga la página
-     * no se cobra dos veces (PayPal devuelve el cobro existente).
+     * Comprueba el pago del pedido con su proveedor. Es idempotente: recargar la página o recibir
+     * el mismo webhook varias veces no cobra ni activa nada dos veces.
      *
-     * @param ordenId el parámetro "token" con el que PayPal regresa al cliente; debe ser la orden de este pedido
+     * @param referencia el "token" con el que regresa el cliente (orden de PayPal o sesión de Stripe); debe ser la de este pedido
      */
-    public Pedido confirmar(Pedido pedido, String ordenId) {
-        if (!Pedido.PENDIENTE.equals(pedido.getEstado()) || ordenId == null || !ordenId.equals(pedido.getOrdenId())) {
+    public Pedido confirmar(Pedido pedido, String referencia) {
+        if (!Pedido.PENDIENTE.equals(pedido.getEstado()) || referencia == null || !referencia.equals(pedido.getOrdenId())) {
             return pedido;
         }
+        if (pedido.getMetodoPago() != null && pedido.getMetodoPago().startsWith(STRIPE)) {
+            return confirmarStripe(pedido, referencia);
+        }
+        String ordenId = referencia;
 
         Captura captura = payPal.capturar(ordenId);
         switch (captura.status() == null ? "" : captura.status()) {
@@ -112,7 +150,45 @@ public class PagoService {
         return pedido;
     }
 
-    /** El cliente canceló en PayPal: el pedido se cierra y su carrito queda igual para intentarlo de nuevo. */
+    /** Webhook de Stripe (checkout.session.completed): confirma el pedido aunque el cliente no haya regresado a la página. */
+    public void confirmarDesdeStripe(String pedidoId, String sesionId) {
+        if (pedidoId == null || sesionId == null) {
+            return;
+        }
+        pedidoRepository.findById(pedidoId).ifPresentOrElse(
+                pedido -> confirmar(pedido, sesionId),
+                () -> log.warn("[FluxG] Webhook de Stripe para un pedido que no existe ({}).", pedidoId));
+    }
+
+    private Pedido confirmarStripe(Pedido pedido, String sesionId) {
+        SesionPago sesion = stripe.obtenerSesion(sesionId);
+        if (!pedido.getId().equals(sesion.referencia())) {
+            log.error("[FluxG] La sesión de Stripe {} no pertenece al pedido {}.", sesionId, pedido.getFolio());
+            return pedido;
+        }
+        if (sesion.pagado()) {
+            if (!"mxn".equalsIgnoreCase(sesion.moneda()) || sesion.montoCentavos() != pedido.getTotal() * 100L) {
+                log.error("[FluxG] El pago de Stripe {} no coincide con el pedido {}: {} {} contra {} MXN. No se marca como pagado.",
+                        sesionId, pedido.getFolio(), sesion.montoCentavos(), sesion.moneda(), pedido.getTotal());
+                return pedido;
+            }
+            pedido.setPagoId(sesion.pagoId());
+            if (pedido.getCorreoCliente() == null) {
+                // Compra como invitado: los datos de contacto son los que capturó en la página de Stripe
+                pedido.setNombreCliente(sesion.nombre());
+                pedido.setCorreoCliente(sesion.correo());
+            }
+            completar(pedido);
+        } else if ("expired".equals(sesion.estado())) {
+            pedido.setEstado(Pedido.CANCELADO);
+            pedidoRepository.save(pedido);
+        }
+        // "open" sin pagar: el cliente aún no termina; el pedido sigue pendiente
+        log.info("[FluxG] Pedido {}: sesión Stripe {} (pagado={}) -> {}", pedido.getFolio(), sesion.estado(), sesion.pagado(), pedido.getEstado());
+        return pedido;
+    }
+
+    /** El cliente canceló en la página de pago: el pedido se cierra y su carrito queda igual para intentarlo de nuevo. */
     public Pedido cancelar(Pedido pedido) {
         if (Pedido.PENDIENTE.equals(pedido.getEstado())) {
             pedido.setEstado(Pedido.CANCELADO);
