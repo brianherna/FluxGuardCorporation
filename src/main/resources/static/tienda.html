@@ -73,6 +73,26 @@
     </div>
   </header>
 
+  <!-- BÚSQUEDA -->
+  <div class="plans-section shop-search">
+    <label for="shop-search-input" class="shop-search-label">BUSCAR PRODUCTOS</label>
+    <div class="shop-search-box">
+      <i class="bi bi-search" aria-hidden="true"></i>
+      <input type="search" id="shop-search-input" placeholder="Busca por nombre o descripción (ej. batería, pantalla, garantía)" autocomplete="off" aria-describedby="shop-search-count" disabled>
+    </div>
+    <div class="shop-filters" role="group" aria-label="Filtrar por categoría">
+      <button type="button" class="shop-filter is-active" data-filtro="TODOS" aria-pressed="true"><i class="bi bi-grid-fill"></i> TODOS</button>
+      <button type="button" class="shop-filter" data-filtro="PROTOTIPO" aria-pressed="false"><i class="bi bi-cpu"></i> HARDWARE</button>
+      <button type="button" class="shop-filter" data-filtro="PERSONALIZACION" aria-pressed="false"><i class="bi bi-sliders"></i> ACCESORIOS</button>
+      <button type="button" class="shop-filter" data-filtro="SERVICIO" aria-pressed="false"><i class="bi bi-shield-check"></i> GARANTÍAS</button>
+      <button type="button" class="shop-filter" data-filtro="PLAN" aria-pressed="false"><i class="bi bi-cloud-check"></i> PLANES</button>
+    </div>
+    <div class="shop-results">
+      <p id="shop-search-count" class="shop-search-count" aria-live="polite"></p>
+      <span class="shop-iva-badge"><i class="bi bi-patch-check-fill"></i> Precios netos · IVA incluido</span>
+    </div>
+  </div>
+
   <div id="shop-status" class="plans-section shop-status d-none"></div>
 
   <!-- 01 / PROTOTIPO -->
@@ -109,9 +129,20 @@
       <p>Servicios que acompañan a tu hardware después de la compra.</p>
     </div>
     <div class="shop-grid"></div>
+  </section>
+
+  <!-- 04 / PLANES -->
+  <section class="plans-section" data-categoria="PLAN">
+    <div class="plans-heading">
+      <div>
+        <span class="section-eyebrow"><span></span> 04 / PLANES</span>
+        <h2>Monitoreo<br><em>continuo.</em></h2>
+      </div>
+      <p>El plan se activa en tu cuenta: necesitas iniciar sesión para agregarlo al carrito. Solo puedes tener un plan a la vez.</p>
+    </div>
+    <div class="shop-grid"></div>
     <p class="plans-note">
-      Precios en pesos mexicanos con IVA incluido. ¿Buscas un plan de monitoreo (Free, Standard o Ultimate)?
-      Los encuentras en <a href="planes.html">Planes</a>.
+      Precios en pesos mexicanos. ¿Necesitas el plan Ultimate para varias sedes? Consulta todos los detalles en <a href="planes.html">Planes</a>.
     </p>
   </section>
 
@@ -146,13 +177,78 @@
       });
 
       document.querySelectorAll(".shop-card[data-producto]").forEach(conectarTarjeta);
+      initBusqueda(productos);
+    }
+
+    // Quita acentos y mayúsculas para que "bateria" encuentre "Batería"
+    const normalizar = texto => String(texto || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+
+    // Búsqueda por texto y filtro por categoría: un producto se muestra si cumple ambos
+    function initBusqueda(productos) {
+      const input = document.getElementById("shop-search-input");
+      const contador = document.getElementById("shop-search-count");
+      const filtros = [...document.querySelectorAll(".shop-filter[data-filtro]")];
+      const textos = new Map(productos.map(p => [p.id, normalizar(`${p.nombre} ${p.descripcion}`)]));
+      const secciones = [...document.querySelectorAll("section[data-categoria]")];
+      const total = document.querySelectorAll(".shop-card[data-producto]").length;
+      let categoria = "TODOS";
+
+      const filtrar = () => {
+        const palabras = normalizar(input.value).split(/\s+/).filter(Boolean);
+        let visibles = 0;
+        secciones.forEach(section => {
+          const enCategoria = categoria === "TODOS" || section.dataset.categoria === categoria;
+          let enSeccion = 0;
+          section.querySelectorAll(".shop-card[data-producto]").forEach(card => {
+            const texto = textos.get(card.dataset.producto) || "";
+            const coincide = enCategoria && palabras.every(palabra => texto.includes(palabra));
+            card.hidden = !coincide;
+            if (coincide) enSeccion++;
+          });
+          section.hidden = enSeccion === 0;
+          visibles += enSeccion;
+        });
+        contador.innerHTML = `Mostrando <b>${visibles}</b> de <b>${total}</b> productos`
+          + (visibles === 0 && palabras.length ? ` · No encontramos coincidencias para "${escapeHtml(input.value.trim())}".` : "");
+      };
+
+      filtros.forEach(boton => boton.addEventListener("click", () => {
+        categoria = boton.dataset.filtro;
+        filtros.forEach(b => {
+          const activo = b === boton;
+          b.classList.toggle("is-active", activo);
+          b.setAttribute("aria-pressed", String(activo));
+        });
+        filtrar();
+      }));
+
+      input.disabled = false;
+      input.addEventListener("input", filtrar);
+      filtrar();
+    }
+
+    // Indicador de disponibilidad: los servicios (stock null) no se agotan
+    function disponibilidad(p) {
+      if (p.stock === null || p.stock === undefined) {
+        return `<span class="shop-stock is-ok"><i class="bi bi-check-circle-fill"></i> DISPONIBLE</span>`;
+      }
+      if (p.stock <= 0) {
+        return `<span class="shop-stock is-out"><i class="bi bi-x-circle-fill"></i> AGOTADO</span>`;
+      }
+      const unidades = `${p.stock} ${p.stock === 1 ? "unidad disponible" : "unidades disponibles"}`;
+      if (p.stock <= 5) {
+        return `<span class="shop-stock is-low"><i class="bi bi-exclamation-circle-fill"></i> ÚLTIMAS PIEZAS · ${unidades}</span>`;
+      }
+      return `<span class="shop-stock is-ok"><i class="bi bi-check-circle-fill"></i> EN STOCK · ${unidades}</span>`;
     }
 
     function tarjetaProducto(p, i) {
-      const etiqueta = { PROTOTIPO: "HARDWARE IOT", PERSONALIZACION: "PERSONALIZACIÓN", SERVICIO: "SERVICIO" }[p.categoria] || "";
-      const conCantidad = p.maxCantidad > 1;
+      const etiqueta = { PROTOTIPO: "HARDWARE IOT", PERSONALIZACION: "PERSONALIZACIÓN", SERVICIO: "SERVICIO", PLAN: "PLAN DE MONITOREO" }[p.categoria] || "";
+      const agotado = p.stock !== null && p.stock !== undefined && p.stock <= 0;
+      const maximo = agotado ? 0 : Math.min(p.maxCantidad, p.stock ?? p.maxCantidad);
+      const conCantidad = maximo > 1;
       return `
-        <article class="plan-card shop-card${p.id === "kit-piloto" ? " is-popular" : ""}" data-producto="${escapeHtml(p.id)}" data-max="${p.maxCantidad}">
+        <article class="plan-card shop-card${p.id === "kit-piloto" ? " is-popular" : ""}${agotado ? " is-sold-out" : ""}" data-producto="${escapeHtml(p.id)}" data-max="${maximo}">
           <div class="plan-top">
             <span>${String(i + 1).padStart(2, "0")}</span>
             <div class="plan-icon"><i class="bi ${escapeHtml(p.icono)} fs-5"></i></div>
@@ -161,6 +257,10 @@
           <h3>${escapeHtml(p.nombre)}</h3>
           <p class="plan-description">${escapeHtml(p.descripcion)}</p>
           ${p.requiereKit ? `<span class="shop-tag"><i class="bi bi-link-45deg"></i> REQUIERE KIT PILOTO</span>` : ""}
+          <div class="shop-meta">
+            ${disponibilidad(p)}
+            ${p.garantia ? `<span class="shop-warranty"><i class="bi bi-shield-check"></i> ${escapeHtml(p.garantia)}</span>` : ""}
+          </div>
           <div class="plan-price">
             <strong>${dinero(p.precio)}</strong>
             <span> ${escapeHtml(p.unidad)}</span>
@@ -172,7 +272,9 @@
               <output>1</output>
               <button type="button" data-qty="1" aria-label="Más"><i class="bi bi-plus"></i></button>
             </div>` : ""}
-            <button type="button" class="plan-button" data-agregar>AGREGAR <i class="bi bi-cart-plus"></i></button>
+            ${agotado
+              ? `<button type="button" class="plan-button" disabled>AGOTADO <i class="bi bi-x-circle"></i></button>`
+              : `<button type="button" class="plan-button" data-agregar>AGREGAR <i class="bi bi-cart-plus"></i></button>`}
           </div>
           <div class="shop-feedback" aria-live="polite"></div>
         </article>`;
@@ -183,6 +285,7 @@
       const output = card.querySelector(".shop-qty output");
       const feedback = card.querySelector(".shop-feedback");
       const boton = card.querySelector("[data-agregar]");
+      if (!boton) return; // agotado
 
       card.querySelectorAll("[data-qty]").forEach(btn => btn.addEventListener("click", () => {
         const valor = Math.min(max, Math.max(1, Number(output.textContent) + Number(btn.dataset.qty)));

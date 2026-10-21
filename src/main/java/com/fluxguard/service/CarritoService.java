@@ -22,6 +22,7 @@ import java.util.Optional;
  * - Personalizaciones y garantía requieren un kit piloto en el carrito o comprado (y pagado) antes,
  *   y se permite como máximo una de cada una por kit.
  * - Los precios siempre salen del catálogo, nunca del navegador.
+ * - No se puede pedir más de lo que hay en stock; un producto agotado no se puede agregar.
  * - Los invitados (sin sesión) pueden comprar hardware y servicios, pero no planes: un plan se activa en una cuenta.
  */
 @Service
@@ -185,6 +186,12 @@ public class CarritoService {
     }
 
     private void validarCantidad(Carrito carrito, Producto producto, int cantidad, int kitsComprados) {
+        if (producto.agotado()) {
+            throw new CarritoException(producto.nombre() + " está agotado por el momento.");
+        }
+        if (producto.stock() != null && cantidad > producto.stock()) {
+            throw new CarritoException("Solo quedan " + producto.stock() + " unidades de " + producto.nombre() + ".");
+        }
         if (cantidad > producto.maxCantidad()) {
             throw new CarritoException("Puedes pedir hasta " + producto.maxCantidad() + " de " + producto.nombre() + ".");
         }
@@ -213,13 +220,19 @@ public class CarritoService {
                 continue;
             }
             Producto p = producto.get();
-            int maximo = p.requiereKit() ? Math.min(p.maxCantidad(), kits) : p.maxCantidad();
-            if (maximo == 0) {
+            int maximo = maximo(p, kits);
+            if (p.agotado()) {
+                it.remove();
+                avisos.add("Se quitó " + p.nombre() + " porque se agotó.");
+            } else if (maximo == 0) {
                 it.remove();
                 avisos.add("Se quitó " + p.nombre() + " porque requiere un Kit Piloto.");
             } else if (item.getCantidad() > maximo) {
                 item.setCantidad(maximo);
-                avisos.add("Se ajustó " + p.nombre() + " a " + maximo + " (una por kit).");
+                boolean porStock = p.stock() != null && maximo == p.stock();
+                avisos.add(porStock
+                        ?"Se ajustó " + p.nombre() + " a " + maximo + " (las unidades que quedan en stock)."
+                        : "Se ajustó " + p.nombre() + " a " + maximo + " (una por kit).");
             } else if (item.getCantidad() < 1) {
                 it.remove();
             }
@@ -235,13 +248,18 @@ public class CarritoService {
         for (Carrito.Item item : carrito.getItems()) {
             Producto p = catalogo.buscar(item.getProductoId()).orElseThrow();
             int importe = p.precio() * item.getCantidad();
-            int maximo = p.requiereKit() ? Math.min(p.maxCantidad(), kits) : p.maxCantidad();
+            int maximo = maximo(p, kits);
             lineas.add(new CarritoDto.Linea(p.id(), p.nombre(), p.categoria().name(), p.icono(), p.unidad(),
                     p.precio(), item.getCantidad(), importe, maximo));
             total += importe;
             articulos += item.getCantidad();
         }
         return new CarritoDto(lineas, total, articulos, avisos);
+    }
+
+    /** Máximo que se puede tener en el carrito de un producto: límite por pedido, stock y, en accesorios, uno por kit. */
+    private static int maximo(Producto p, int kits) {
+        return p.requiereKit() ? Math.min(p.maximoPedible(), kits) : p.maximoPedible();
     }
 
     private Carrito obtener(Comprador comprador) {

@@ -3,6 +3,7 @@ package com.fluxguard;
 import com.fluxguard.dto.CarritoDto;
 import com.fluxguard.model.Carrito;
 import com.fluxguard.model.Pedido;
+import com.fluxguard.model.Producto;
 import com.fluxguard.model.Usuario;
 import com.fluxguard.repository.CarritoRepository;
 import com.fluxguard.repository.PedidoRepository;
@@ -24,6 +25,7 @@ import static org.mockito.Mockito.*;
 class CarritoServiceTests {
 
     private CarritoService service;
+    private CarritoRepository carritoRepository;
     private PedidoRepository pedidoRepository;
     private final List<Pedido> pedidos = new ArrayList<>();
     private final java.util.Map<String, Carrito> carritos = new java.util.HashMap<>();
@@ -32,7 +34,7 @@ class CarritoServiceTests {
 
     @BeforeEach
     void setUp() {
-        CarritoRepository carritoRepository = mock(CarritoRepository.class);
+        carritoRepository = mock(CarritoRepository.class);
         pedidoRepository = mock(PedidoRepository.class);
 
         // Repositorio de carritos en memoria
@@ -169,5 +171,37 @@ class CarritoServiceTests {
 
         assertEquals(350 + 150 + 499, carrito.total());
         assertTrue(service.ver(invitado).lineas().isEmpty());
+    }
+
+    @Test
+    void noSePuedePedirMasQueElStock() {
+        // Batería de respaldo: 5 en stock
+        service.agregar(comprador, "kit-piloto", 8);
+        CarritoException error = assertThrows(CarritoException.class,
+                () -> service.agregar(comprador, "bateria-respaldo", 6));
+        assertTrue(error.getMessage().contains("Solo quedan 5"));
+
+        CarritoDto carrito = service.agregar(comprador, "bateria-respaldo", 5);
+        assertEquals(5, carrito.lineas().stream()
+                .filter(l -> l.productoId().equals("bateria-respaldo")).findFirst().orElseThrow().maxCantidad());
+    }
+
+    @Test
+    void productoAgotadoNoSeAgregaYSeQuitaDelCarrito() {
+        Producto kit = new CatalogoService().buscar("kit-piloto").orElseThrow();
+        Producto kitAgotado = new Producto(kit.id(), kit.nombre(), kit.descripcion(), kit.categoria(), kit.precio(),
+                kit.unidad(), kit.icono(), kit.requiereKit(), kit.maxCantidad(), 0, kit.garantia());
+
+        // El kit ya estaba en el carrito cuando se agotó
+        service.agregar(comprador, "kit-piloto", 1);
+        CarritoService sinStock = new CarritoService(carritoRepository, pedidoRepository,
+                new CatalogoService(List.of(kitAgotado)));
+
+        CarritoException error = assertThrows(CarritoException.class, () -> sinStock.agregar(comprador, "kit-piloto", 1));
+        assertTrue(error.getMessage().contains("agotado"));
+
+        CarritoDto carrito = sinStock.ver(comprador);
+        assertTrue(carrito.lineas().isEmpty());
+        assertFalse(carrito.avisos().isEmpty());
     }
 }
