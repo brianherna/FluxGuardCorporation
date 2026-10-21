@@ -7,7 +7,7 @@ import com.fluxguard.dto.ReenvioRequest;
 import com.fluxguard.dto.UsuarioDto;
 import com.fluxguard.model.Usuario;
 import com.fluxguard.repository.UsuarioRepository;
-import com.fluxguard.service.BrevoEmailService;
+import com.fluxguard.service.CorreoService;
 import com.fluxguard.service.SesionService;
 import com.fluxguard.service.Tokens;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,7 +35,7 @@ public class AuthController {
 
     private final UsuarioRepository usuarioRepository;
     private final PasswordEncoder passwordEncoder;
-    private final BrevoEmailService emailService;
+    private final CorreoService emailService;
     private final SesionService sesionService;
     private final String appBaseUrl;
     // Hash de relleno: el login tarda lo mismo exista o no el correo, así no se puede adivinar qué cuentas existen
@@ -43,7 +43,7 @@ public class AuthController {
 
     public AuthController(UsuarioRepository usuarioRepository,
                           PasswordEncoder passwordEncoder,
-                          BrevoEmailService emailService,
+                          CorreoService emailService,
                           SesionService sesionService,
                           @Value("${app.base-url:${APP_BASE_URL:http://localhost:8080}}") String appBaseUrl) {
         this.usuarioRepository = usuarioRepository;

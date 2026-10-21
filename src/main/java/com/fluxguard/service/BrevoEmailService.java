@@ -8,7 +8,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
-import org.springframework.web.util.HtmlUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -62,11 +61,9 @@ public class BrevoEmailService {
         Map<String, Object> body = Map.of(
                 "sender", Map.of("name", senderName, "email", senderEmail),
                 "to", List.of(Map.of("email", correo, "name", nombre)),
-                "subject", "Verifica tu correo en FluxGuard",
-                "htmlContent", plantillaVerificacion(nombre, enlace, horasVigencia),
-                "textContent", "Hola " + nombre + ",\n\nAbre este enlace para activar tu cuenta de FluxGuard:\n"
-                        + enlace + "\n\nEl enlace vence en " + horasVigencia + " horas."
-                        + "\n\nSi no creaste esta cuenta, ignora este correo."
+                "subject", PlantillaVerificacion.ASUNTO,
+                "htmlContent", PlantillaVerificacion.html(nombre, enlace, horasVigencia),
+                "textContent", PlantillaVerificacion.texto(nombre, enlace, horasVigencia)
         );
 
         try {
@@ -76,7 +73,7 @@ public class BrevoEmailService {
                     .body(body)
                     .retrieve()
                     .toBodilessEntity();
-            log.info("[FluxG] Correo de verificación enviado con Brevo a {}", correo);
+            log.info("[FluxG] Brevo aceptó el correo de verificación para {} (si no llega, revisa Transactional > Logs en Brevo)", correo);
         } catch (RestClientResponseException e) {
             log.error("[FluxG] Brevo rechazó el correo a {} ({}): {}", correo, e.getStatusCode(), e.getResponseBodyAsString());
             throw e;
@@ -84,32 +81,5 @@ public class BrevoEmailService {
             log.error("[FluxG] No se pudo conectar con Brevo para enviar a {}: {}", correo, e.getMessage());
             throw e;
         }
-    }
-
-    private String plantillaVerificacion(String nombre, String enlace, int horasVigencia) {
-        return """
-                <!DOCTYPE html>
-                <html lang="es">
-                <body style="margin:0;padding:0;background:#0b0812;font-family:Arial,Helvetica,sans-serif;">
-                  <table width="100%%" cellpadding="0" cellspacing="0" style="background:#0b0812;padding:32px 12px;">
-                    <tr><td align="center">
-                      <table width="520" cellpadding="0" cellspacing="0" style="max-width:520px;width:100%%;background:#120c1e;border:1px solid #2c2342;">
-                        <tr><td style="padding:28px 32px 8px;color:#b9a7ff;font-size:12px;font-weight:bold;letter-spacing:3px;">FLUXGUARD / VERIFICACIÓN</td></tr>
-                        <tr><td style="padding:8px 32px;color:#ffffff;font-size:26px;font-weight:bold;">Confirma tu correo</td></tr>
-                        <tr><td style="padding:8px 32px 20px;color:#dfd8f0;font-size:15px;line-height:1.6;">
-                          Hola %s, gracias por crear tu cuenta en FluxGuard. Da clic en el botón para activarla:
-                        </td></tr>
-                        <tr><td align="center" style="padding:0 32px 24px;">
-                          <a href="%s" style="display:inline-block;padding:14px 26px;background:#b9a7ff;color:#0b0812;text-decoration:none;font-weight:bold;font-size:13px;letter-spacing:2px;">VERIFICAR MI CUENTA</a>
-                        </td></tr>
-                        <tr><td style="padding:0 32px 28px;color:#9a90b5;font-size:12px;line-height:1.6;">
-                          El enlace vence en %d horas. Si no creaste esta cuenta, puedes ignorar este correo.
-                        </td></tr>
-                      </table>
-                    </td></tr>
-                  </table>
-                </body>
-                </html>
-                """.formatted(HtmlUtils.htmlEscape(nombre), HtmlUtils.htmlEscape(enlace), horasVigencia);
     }
 }

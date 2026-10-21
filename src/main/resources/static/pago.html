@@ -241,7 +241,7 @@
               <div class="text-white-50" id="user-display-email" style="font-size:13px;">correo@ejemplo.com</div>
             </div>
             <div>
-              <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-50 py-1 px-2" style="font-size:11px;">
+              <span id="badge-sesion" class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-50 py-1 px-2" style="font-size:11px;">
                 <i class="bi bi-check-circle-fill me-1"></i> Sesión Activa
               </span>
             </div>
@@ -251,12 +251,12 @@
         <div id="checkout-alert" class="d-none"></div>
 
         <button type="button" id="btn-submit-payment" class="btn-pay-action">
-          <span id="btn-pay-text">CONFIRMAR Y ACTIVAR MONITOREO</span>
+          <span id="btn-pay-text">CONTINUAR AL PAGO</span>
           <i class="bi bi-arrow-up-right-circle-fill fs-5"></i>
         </button>
 
         <div class="d-flex justify-content-center align-items-center gap-3 mt-4 text-white-50 flex-wrap" style="font-size:11px;">
-          <span><i class="bi bi-check-all text-success"></i> Activación al instante</span>
+          <span><i class="bi bi-shield-lock text-success"></i> Pago seguro con PayPal</span>
           <span>•</span>
           <span><i class="bi bi-speedometer2 text-info"></i> Acceso a Dashboard</span>
           <span>•</span>
@@ -351,6 +351,12 @@
       };
 
       const tipoPlan = planesConfig[plan] ? plan : "standard";
+
+      // Ultimate se cotiza según el proyecto: se atiende por ventas
+      if (tipoPlan === "ultimate") {
+        window.location.href = "contacto.html?plan=ultimate&interes=Implementacion";
+        return;
+      }
       const selected = planesConfig[tipoPlan];
 
       // Actualizar DOM
@@ -375,46 +381,36 @@
       const irALogin = () => {
         window.location.href = `login.html?solicitar=plan&plan=${tipoPlan}&redirect=${encodeURIComponent(window.location.href)}`;
       };
-      const userObj = await obtenerUsuarioSesion();
-      if (!userObj) {
+      // Los planes se activan en una cuenta; el kit piloto se puede comprar como invitado
+      const userObj = localStorage.getItem("fluxg_token") ? await obtenerUsuarioSesion() : null;
+      if (!userObj && tipoPlan !== "prototipo") {
         irALogin();
         return;
       }
-      const fullName = `${userObj.nombre || "Usuario"} ${userObj.apellido || ""}`.trim();
+      const fullName = userObj ? `${userObj.nombre || "Usuario"} ${userObj.apellido || ""}`.trim() : "Compra como invitado";
       document.getElementById("user-display-name").textContent = fullName;
-      document.getElementById("user-display-email").textContent = userObj.correo || "";
+      document.getElementById("user-display-email").textContent = userObj
+        ? (userObj.correo || "")
+        : "Tus datos de contacto se toman de tu cuenta de PayPal al pagar";
+      if (!userObj) document.getElementById("badge-sesion")?.classList.add("d-none");
 
       // Acción de activación
       const alertBox = document.getElementById("checkout-alert");
       const payButton = document.getElementById("btn-submit-payment");
 
+      // El plan (o el kit piloto) se agrega al carrito y el cobro se hace con PayPal desde carrito.html
+      const productoPorPlan = { free: "plan-free", standard: "plan-standard", prototipo: "kit-piloto" };
+
       payButton.addEventListener("click", async () => {
         const textoOriginal = payButton.innerHTML;
         payButton.disabled = true;
-        payButton.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> ACTIVANDO TU MONITOREO...`;
+        payButton.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> PREPARANDO TU PEDIDO...`;
 
         try {
-          // La suscripción se guarda en el servidor (MongoDB); el precio y los circuitos los decide el backend
-          const response = await apiFetch("/api/suscripcion", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ plan: tipoPlan })
-          });
-          if (response.status === 401) {
-            irALogin();
-            return;
+          const carrito = await agregarAlCarrito(productoPorPlan[tipoPlan], 1);
+          if (carrito) {
+            window.location.href = "carrito.html";
           }
-          const data = await response.json().catch(() => null);
-          if (!response.ok || !data?.success || !data.usuario) {
-            throw new Error(data?.message || "No se pudo activar tu plan. Intenta de nuevo.");
-          }
-          actualizarUsuario(data.usuario);
-
-          showAlert(alertBox, "success", "<strong>¡Servicio activado con éxito!</strong> Tu plan de monitoreo ha quedado vinculado a tu cuenta. Redirigiendo a tu Dashboard de Monitoreo...");
-
-          setTimeout(() => {
-            window.location.href = "dashboard.html";
-          }, 1200);
         } catch (error) {
           showAlert(alertBox, "danger", escapeHtml(error.message || "No se pudo conectar con el servidor."));
           payButton.disabled = false;
