@@ -109,20 +109,9 @@
       <p>Servicios que acompañan a tu hardware después de la compra.</p>
     </div>
     <div class="shop-grid"></div>
-  </section>
-
-  <!-- 04 / PLANES -->
-  <section class="plans-section" data-categoria="PLAN">
-    <div class="plans-heading">
-      <div>
-        <span class="section-eyebrow"><span></span> 04 / PLANES</span>
-        <h2>Software de<br><em>monitoreo.</em></h2>
-      </div>
-      <p>Solo puede haber un plan en el carrito: si agregas otro, reemplaza al anterior. Ultimate se cotiza según tu proyecto.</p>
-    </div>
-    <div class="shop-grid"></div>
     <p class="plans-note">
-      Precios en pesos mexicanos con IVA incluido. Los planes se cobran por mes; el primer mes se incluye en esta compra.
+      Precios en pesos mexicanos con IVA incluido. ¿Buscas un plan de monitoreo (Free, Standard o Ultimate)?
+      Los encuentras en <a href="planes.html">Planes</a>.
     </p>
   </section>
 
@@ -154,14 +143,13 @@
         const grid = section.querySelector(".shop-grid");
         const lista = productos.filter(p => p.categoria === section.dataset.categoria);
         grid.innerHTML = lista.map((p, i) => tarjetaProducto(p, i)).join("");
-        if (section.dataset.categoria === "PLAN") grid.insertAdjacentHTML("beforeend", tarjetaUltimate(lista.length));
       });
 
       document.querySelectorAll(".shop-card[data-producto]").forEach(conectarTarjeta);
     }
 
     function tarjetaProducto(p, i) {
-      const etiqueta = { PROTOTIPO: "HARDWARE IOT", PERSONALIZACION: "PERSONALIZACIÓN", SERVICIO: "SERVICIO", PLAN: "SUSCRIPCIÓN" }[p.categoria] || "";
+      const etiqueta = { PROTOTIPO: "HARDWARE IOT", PERSONALIZACION: "PERSONALIZACIÓN", SERVICIO: "SERVICIO" }[p.categoria] || "";
       const conCantidad = p.maxCantidad > 1;
       return `
         <article class="plan-card shop-card${p.id === "kit-piloto" ? " is-popular" : ""}" data-producto="${escapeHtml(p.id)}" data-max="${p.maxCantidad}">
@@ -187,23 +175,6 @@
             <button type="button" class="plan-button" data-agregar>AGREGAR <i class="bi bi-cart-plus"></i></button>
           </div>
           <div class="shop-feedback" aria-live="polite"></div>
-        </article>`;
-    }
-
-    function tarjetaUltimate(i) {
-      return `
-        <article class="plan-card shop-card">
-          <div class="plan-top">
-            <span>${String(i + 1).padStart(2, "0")}</span>
-            <div class="plan-icon"><i class="bi bi-stars fs-5"></i></div>
-          </div>
-          <span class="plan-eyebrow">PARA OPERACIONES A ESCALA</span>
-          <h3>Plan Ultimate</h3>
-          <p class="plan-description">Multi-sede, más de 5 circuitos, integraciones API/MQTT y soporte especializado.</p>
-          <div class="plan-price"><strong>A COTIZAR</strong><span> SEGÚN ALCANCE</span></div>
-          <div class="shop-actions">
-            <a href="contacto.html?plan=ultimate" class="plan-button">HABLAR CON VENTAS <i class="bi bi-arrow-up-right"></i></a>
-          </div>
         </article>`;
     }
 
