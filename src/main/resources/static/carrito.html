@@ -66,11 +66,19 @@
     // Si el carrito cambia desde el panel lateral, se vuelve a dibujar el resumen
     document.addEventListener("carrito:actualizado", event => renderResumen(event.detail));
 
+    // Métodos de pago que el servidor tiene configurados ("paypal", "stripe")
+    let metodosPago = ["paypal"];
+
     async function initCheckoutCarrito() {
       // No hace falta iniciar sesión: sin sesión se paga como invitado
       if (localStorage.getItem("fluxg_token")) await obtenerUsuarioSesion();
+      try {
+        const res = await fetch(`${API_BASE}/api/pagos/metodos`);
+        const data = await res.json();
+        if (res.ok && Array.isArray(data.metodosPago)) metodosPago = data.metodosPago;
+      } catch (_) {}
 
-      // Regreso desde PayPal: carrito.html?pedido=FOLIO&token=ORDEN (aprobado) o &cancelado=1
+      // Regreso desde PayPal o Stripe: carrito.html?pedido=FOLIO&token=REFERENCIA (pagado) o &cancelado=1
       const params = new URLSearchParams(window.location.search);
       const folio = params.get("pedido");
       if (folio) {
@@ -90,7 +98,7 @@
     async function procesarRegreso(folio, token, cancelado) {
       const alertBox = document.getElementById("checkout-alert");
       const box = document.getElementById("checkout-box");
-      box.innerHTML = `<div class="text-center py-4"><span class="spinner-border spinner-border-sm me-2"></span> ${cancelado ? "Cancelando..." : "Confirmando tu pago con PayPal..."}</div>`;
+      box.innerHTML = `<div class="text-center py-4"><span class="spinner-border spinner-border-sm me-2"></span> ${cancelado ? "Cancelando..." : "Confirmando tu pago..."}</div>`;
 
       const ruta = cancelado ? `/api/pedidos/${encodeURIComponent(folio)}/cancelar`
         : token ? `/api/pedidos/${encodeURIComponent(folio)}/confirmar?token=${encodeURIComponent(token)}`
@@ -117,11 +125,13 @@
       }
 
       if (pedido.estado === "PENDIENTE" && pedido.pagoId) {
-        showAlert(alertBox, "info", `PayPal está revisando el pago de tu pedido <strong>${escapeHtml(pedido.folio)}</strong>. Lo activaremos en cuanto se confirme.`);
+        showAlert(alertBox, "info", `Tu pago del pedido <strong>${escapeHtml(pedido.folio)}</strong> está en revisión. Lo activaremos en cuanto se confirme.`);
+      } else if (pedido.estado === "PENDIENTE") {
+        showAlert(alertBox, "info", `Aún no recibimos la confirmación del pago de tu pedido <strong>${escapeHtml(pedido.folio)}</strong>. Si ya pagaste, recarga en un momento.`);
       } else if (pedido.estado === "CANCELADO") {
-        showAlert(alertBox, "info", "Cancelaste el pago en PayPal. Tu carrito sigue aquí por si quieres intentarlo de nuevo.");
+        showAlert(alertBox, "info", "Cancelaste el pago. Tu carrito sigue aquí por si quieres intentarlo de nuevo.");
       } else {
-        showAlert(alertBox, "danger", "PayPal no pudo completar el pago. No se hizo ningún cargo; puedes intentarlo de nuevo.");
+        showAlert(alertBox, "danger", "No se pudo completar el pago. No se hizo ningún cargo; puedes intentarlo de nuevo.");
       }
       renderResumen(await cargarCarrito().catch(() => null));
     }
@@ -140,30 +150,37 @@
       }
 
       const gratis = carrito.total === 0;
+      const botones = gratis
+        ? `<button type="button" class="plan-button cart-checkout w-100" data-metodo="paypal">CONFIRMAR PEDIDO <i class="bi bi-arrow-up-right"></i></button>`
+        : [
+            metodosPago.includes("stripe") ? `<button type="button" class="plan-button cart-checkout w-100 mb-2" data-metodo="stripe">PAGAR CON TARJETA <i class="bi bi-credit-card"></i></button>` : "",
+            metodosPago.includes("paypal") ? `<button type="button" class="plan-button w-100" data-metodo="paypal">PAGAR CON PAYPAL <i class="bi bi-paypal"></i></button>` : ""
+          ].join("");
       box.innerHTML = `
         <div class="cart-lines">${lineasCarritoHtml(carrito)}</div>
         <div class="cart-total"><span>TOTAL · IVA INCLUIDO</span><strong>${dinero(carrito.total)}</strong></div>
-        <button type="button" class="plan-button cart-checkout w-100" id="btn-confirmar-compra">
-          ${gratis ? `CONFIRMAR PEDIDO <i class="bi bi-arrow-up-right"></i>` : `PAGAR CON PAYPAL <i class="bi bi-paypal"></i>`}
-        </button>
+        ${botones || `<p class="m-0">Los pagos no están disponibles en este momento.</p>`}
         ${gratis ? "" : `
         <p class="checkout-note">
-          <i class="bi bi-info-circle me-1"></i> Modo de prueba (PayPal Sandbox): inicia sesión en PayPal con una
-          <strong>cuenta compradora de prueba</strong>. No se cobra dinero real. Al aprobar regresarás aquí y tu pedido se confirmará.
+          <i class="bi bi-info-circle me-1"></i> Modo de prueba: no se cobra dinero real.
+          ${metodosPago.includes("stripe") ? `Con tarjeta usa <strong>4242 4242 4242 4242</strong>, cualquier fecha futura y cualquier CVC.` : ""}
+          ${metodosPago.includes("paypal") ? `Con PayPal inicia sesión con una <strong>cuenta compradora de prueba</strong>.` : ""}
+          Al pagar regresarás aquí y tu pedido se confirmará.
         </p>`}`;
       if (carrito.avisos?.length) showAlert(alertBox, "info", carrito.avisos.map(escapeHtml).join("<br>"));
       conectarLineasCarrito(box, carrito, alertBox);
-      document.getElementById("btn-confirmar-compra").addEventListener("click", iniciarPago);
+      box.querySelectorAll("button[data-metodo]").forEach(b => b.addEventListener("click", iniciarPago));
     }
 
     async function iniciarPago(event) {
       const boton = event.currentTarget;
+      const metodo = boton.dataset.metodo;
       const textoOriginal = boton.innerHTML;
       const alertBox = document.getElementById("checkout-alert");
-      boton.disabled = true;
-      boton.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> CONECTANDO CON PAYPAL...`;
+      document.querySelectorAll("button[data-metodo]").forEach(b => b.disabled = true);
+      boton.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> CONECTANDO CON ${metodo === "stripe" ? "STRIPE" : "PAYPAL"}...`;
       try {
-        const response = await apiFetch("/api/carrito/comprar", { method: "POST" });
+        const response = await apiFetch(`/api/carrito/comprar?metodo=${encodeURIComponent(metodo)}`, { method: "POST" });
         const data = await response.json().catch(() => null);
         if (!response.ok || !data?.success) {
           // El servidor pudo ajustar el carrito: se vuelve a cargar antes de mostrar el error
@@ -174,21 +191,23 @@
           window.location.href = data.urlPago;
           return;
         }
-        // Pedido de $0: se confirma sin pasar por PayPal
+        // Pedido de $0: se confirma sin pasar por la página de pago
         if (data.usuario) actualizarUsuario(data.usuario);
         renderPanelCarrito({ lineas: [], total: 0, cantidadArticulos: 0 });
         mostrarExito(data.pedido, data.usuario);
       } catch (error) {
         showAlert(alertBox, "danger", escapeHtml(error.message));
-        boton.disabled = false;
+        document.querySelectorAll("button[data-metodo]").forEach(b => b.disabled = false);
         boton.innerHTML = textoOriginal;
       }
     }
 
     function mostrarExito(pedido, usuario) {
       document.getElementById("checkout-alert").classList.add("d-none");
-      const metodo = pedido.metodoPago === "paypal_sandbox" ? "PayPal (modo de prueba)"
-        : pedido.metodoPago === "paypal" ? "PayPal" : "Sin costo";
+      const metodo = {
+        paypal_sandbox: "PayPal (modo de prueba)", paypal: "PayPal",
+        stripe_test: "Tarjeta (modo de prueba)", stripe: "Tarjeta"
+      }[pedido.metodoPago] || "Sin costo";
       document.getElementById("checkout-box").innerHTML = `
         <div class="checkout-success">
           <i class="bi bi-check2-circle"></i>
