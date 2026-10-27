@@ -18,6 +18,7 @@ public class ApiResponse<T> {
     private String token;
     private CarritoDto carrito;
     private Pedido pedido;
+    private List<Pedido> pedidos;
     private List<Producto> productos;
     private String urlPago;
     private List<String> metodosPago;
@@ -139,5 +140,13 @@ public class ApiResponse<T> {
 
     public void setMetodosPago(List<String> metodosPago) {
         this.metodosPago = metodosPago;
+    }
+
+    public List<Pedido> getPedidos() {
+        return pedidos;
+    }
+
+    public void setPedidos(List<Pedido> pedidos) {
+        this.pedidos = pedidos;
     }
 }

@@ -52,6 +52,29 @@
     <div class="checkout-box" id="checkout-box">
       <div class="text-center py-4"><span class="spinner-border spinner-border-sm me-2"></span> Cargando tu carrito...</div>
     </div>
+
+    <!-- Acceso a políticas: cada tarjeta abre la sobrepantalla en su pestaña -->
+    <section class="checkout-policies" aria-labelledby="politicas-titulo">
+      <span class="section-eyebrow" id="politicas-titulo"><span></span> ANTES DE COMPRAR</span>
+      <div class="checkout-policies-grid">
+        <button type="button" class="policy-card" data-sobrepantalla="politicas" data-seccion="compra">
+          <i class="bi bi-bag-check"></i>
+          <strong>Políticas de compra</strong>
+          <span>Precios, pagos, folios y factura.</span>
+        </button>
+        <button type="button" class="policy-card" data-sobrepantalla="politicas" data-seccion="envio">
+          <i class="bi bi-truck"></i>
+          <strong>Envío</strong>
+          <span>Cobertura, costo y tiempos de entrega.</span>
+        </button>
+        <button type="button" class="policy-card" data-sobrepantalla="politicas" data-seccion="devoluciones">
+          <i class="bi bi-arrow-counterclockwise"></i>
+          <strong>Devoluciones y garantía</strong>
+          <span>Cancelación, cambios y reembolsos.</span>
+        </button>
+      </div>
+      <p class="checkout-policies-note">Al pagar aceptas nuestras políticas. Consulta también el <a href="#" data-sobrepantalla="privacidad">Aviso de Privacidad</a>.</p>
+    </section>
   </main>
 
   <footer class="plans-footer">
@@ -160,6 +183,12 @@
         <div class="cart-lines">${lineasCarritoHtml(carrito)}</div>
         <div class="cart-total"><span>TOTAL · IVA INCLUIDO</span><strong>${dinero(carrito.total)}</strong></div>
         ${botones || `<p class="m-0">Los pagos no están disponibles en este momento.</p>`}
+        <p class="checkout-note checkout-policy-line">
+          <i class="bi bi-shield-check me-1"></i> Al continuar aceptas las
+          <a href="#" data-sobrepantalla="politicas" data-seccion="compra">políticas de compra</a>,
+          <a href="#" data-sobrepantalla="politicas" data-seccion="envio">envío</a> y
+          <a href="#" data-sobrepantalla="politicas" data-seccion="devoluciones">devoluciones</a>.
+        </p>
         ${gratis ? "" : `
         <p class="checkout-note">
           <i class="bi bi-info-circle me-1"></i> Modo de prueba: no se cobra dinero real.
@@ -204,10 +233,7 @@
 
     function mostrarExito(pedido, usuario) {
       document.getElementById("checkout-alert").classList.add("d-none");
-      const metodo = {
-        paypal_sandbox: "PayPal (modo de prueba)", paypal: "PayPal",
-        stripe_test: "Tarjeta (modo de prueba)", stripe: "Tarjeta"
-      }[pedido.metodoPago] || "Sin costo";
+      const metodo = nombreMetodoPago(pedido.metodoPago);
       document.getElementById("checkout-box").innerHTML = `
         <div class="checkout-success">
           <i class="bi bi-check2-circle"></i>

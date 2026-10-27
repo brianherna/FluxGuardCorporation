@@ -31,6 +31,8 @@ public class AuthController {
     private static final int HORAS_VIGENCIA_ENLACE = 24;
     private static final Duration ESPERA_REENVIO = Duration.ofSeconds(60);
     private static final String CREDENCIALES_INCORRECTAS = "Correo o contraseña incorrectos.";
+    /** Versión vigente del Aviso de Privacidad (crear-cuenta.html). Cámbiala cuando se actualice el texto del aviso. */
+    public static final String VERSION_AVISO_PRIVACIDAD = "2026-10";
     private static final String REENVIO_GENERICO = "Si hay una cuenta pendiente de verificación con ese correo, te enviamos un enlace nuevo.";
 
     private final UsuarioRepository usuarioRepository;
@@ -81,6 +83,11 @@ public class AuthController {
                     .body(ApiResponse.error("La contraseña debe tener al menos 8 caracteres, una letra mayúscula y un carácter especial (ej. @, #, $, !, %)."));
         }
 
+        if (!Boolean.TRUE.equals(request.getAceptaPrivacidad())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(ApiResponse.error("Debes leer y aceptar el Aviso de Privacidad para crear tu cuenta."));
+        }
+
         Optional<Usuario> existente = usuarioRepository.findByCorreo(email);
         Usuario usuario;
         if (existente.isPresent()) {
@@ -101,6 +108,9 @@ public class AuthController {
         } else {
             usuario = new Usuario(nombre, apellido, email, passwordEncoder.encode(password));
         }
+
+        usuario.setPrivacidadAceptadaEn(LocalDateTime.now());
+        usuario.setVersionAvisoPrivacidad(VERSION_AVISO_PRIVACIDAD);
 
         String token = asignarToken(usuario);
         Usuario guardado = usuarioRepository.save(usuario);

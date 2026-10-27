@@ -1,17 +1,23 @@
 package com.fluxguard;
 
 import com.fluxguard.controller.AuthController;
+import com.fluxguard.controller.PagoController;
 import com.fluxguard.controller.ProspectoController;
 import com.fluxguard.dto.LoginRequest;
+import com.fluxguard.dto.RegisterRequest;
+import com.fluxguard.model.Pedido;
 import com.fluxguard.model.Sesion;
 import com.fluxguard.model.Usuario;
+import com.fluxguard.repository.PedidoRepository;
 import com.fluxguard.repository.ProspectoRepository;
 import com.fluxguard.repository.SesionRepository;
 import com.fluxguard.repository.UsuarioRepository;
 import com.fluxguard.service.BrevoEmailService;
 import com.fluxguard.service.CorreoService;
+import com.fluxguard.service.PagoService;
 import com.fluxguard.service.ResendEmailService;
 import com.fluxguard.service.SesionService;
+import com.fluxguard.service.StripeService;
 import com.fluxguard.service.Tokens;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -92,6 +98,52 @@ class ControladoresTests {
         assertTrue(sesionService.usuarioDesde("Bearer " + token).isEmpty());
         assertTrue(sesionService.usuarioDesde(token).isEmpty());
         assertTrue(sesionService.usuarioDesde(null).isEmpty());
+    }
+
+    private RegisterRequest registro(Boolean aceptaPrivacidad) {
+        RegisterRequest request = new RegisterRequest();
+        request.setNombre("Ana");
+        request.setApellido("Lopez");
+        request.setEmail("ana@fluxguard.io");
+        request.setPassword("Segura#123");
+        request.setAceptaPrivacidad(aceptaPrivacidad);
+        return request;
+    }
+
+    @Test
+    void registroExigeAceptarElAvisoDePrivacidad() {
+        assertEquals(HttpStatus.BAD_REQUEST, authController.register(registro(null)).getStatusCode());
+        assertEquals(HttpStatus.BAD_REQUEST, authController.register(registro(false)).getStatusCode());
+        verify(usuarioRepository, never()).save(any());
+
+        var respuesta = authController.register(registro(true));
+
+        assertEquals(HttpStatus.CREATED, respuesta.getStatusCode());
+        verify(usuarioRepository).save(argThat(u -> u.getPrivacidadAceptadaEn() != null
+                && AuthController.VERSION_AVISO_PRIVACIDAD.equals(u.getVersionAvisoPrivacidad())));
+    }
+
+    @Test
+    void historialDeComprasSoloConSesionYSoloLosPedidosPropios() {
+        Usuario usuario = usuarioVerificado();
+        when(usuarioRepository.findById("u1")).thenReturn(Optional.of(usuario));
+        String token = sesionService.crear(usuario);
+        when(sesionRepository.findByTokenHash(Tokens.sha256(token))).thenReturn(Optional.of(
+                new Sesion(Tokens.sha256(token), "u1", LocalDateTime.now(), LocalDateTime.now().plusDays(1))));
+
+        PedidoRepository pedidoRepository = mock(PedidoRepository.class);
+        Pedido propio = new Pedido("FLX-P1", "u1", List.of(), 350, Pedido.PAGADO, LocalDateTime.now());
+        when(pedidoRepository.findByUsuarioIdOrderByFechaDesc("u1")).thenReturn(List.of(propio));
+        PagoController controller = new PagoController(mock(PagoService.class), mock(StripeService.class),
+                pedidoRepository, usuarioRepository, sesionService);
+
+        assertEquals(HttpStatus.UNAUTHORIZED, controller.pedidos(null).getStatusCode());
+        assertEquals(HttpStatus.UNAUTHORIZED, controller.pedidos("Bearer " + Tokens.nuevo()).getStatusCode());
+
+        var respuesta = controller.pedidos("Bearer " + token);
+        assertEquals(HttpStatus.OK, respuesta.getStatusCode());
+        assertEquals(List.of(propio), respuesta.getBody().getPedidos());
+        verify(pedidoRepository, only()).findByUsuarioIdOrderByFechaDesc("u1");
     }
 
     @Test

@@ -1774,3 +1774,64 @@ select {
 .checkout-success .plan-button{display:inline-flex;margin:8px 6px 0}
 @media(max-width:700px){.shop-grid{margin-top:40px}.checkout-shell{width:calc(100% - 32px);padding-top:120px}.checkout-box{padding:18px}.cart-panel{--bs-offcanvas-width:100%}.navbar-cart{margin-right:6px}}
 @media(max-width:700px){.navbar-user-name{display:none}#navbar-auth-action .btn-flux-outline{padding:0 10px !important}.navbar-mobile-toggle{flex-shrink:0}}
+
+/* ===== Sobrepantallas: Aviso de Privacidad, Políticas e Historial de compras ===== */
+.flux-modal{--bs-modal-bg:#0e0a17;--bs-modal-color:#f5f2fc;--bs-modal-border-color:rgba(185,167,255,.3);--bs-modal-border-radius:4px;--bs-modal-header-border-color:rgba(255,255,255,.08);--bs-modal-footer-border-color:rgba(255,255,255,.08);--bs-modal-width:860px}
+.flux-modal .modal-content{box-shadow:0 30px 100px rgba(0,0,0,.7)}
+.flux-modal .modal-header{align-items:flex-start;padding:26px 28px 18px}
+.flux-modal-kicker{display:block;color:var(--gold);font-size:9px;font-weight:900;letter-spacing:.16em}
+.flux-modal .modal-title{margin:6px 0 0;font-family:"Barlow Condensed";font-size:clamp(30px,4vw,42px);font-weight:900;line-height:.95;text-transform:uppercase}
+.flux-modal .modal-body{padding:22px 28px}
+.flux-modal .modal-footer{gap:10px;padding:16px 28px}
+.flux-modal .modal-footer .plan-button{width:auto;margin:0;padding:0 20px;min-height:44px}
+.flux-modal-secundario{background:transparent;border-color:rgba(255,255,255,.2);color:#d8d0ee}
+.flux-modal-tabs{margin:0 0 22px}
+.modal-backdrop.show{opacity:.75}
+.flux-legal{color:#d8d0ee;font-size:14px;line-height:1.7}
+.flux-legal h3{margin:24px 0 8px;color:#fff;font-family:"Barlow Condensed";font-size:22px;font-weight:800;letter-spacing:.02em;text-transform:uppercase}
+.flux-legal h3:first-child,.flux-legal-fecha+h3{margin-top:4px}
+.flux-legal ul,.flux-legal ol{padding-left:20px}
+.flux-legal li{margin-bottom:6px}
+.flux-legal strong{color:#fff}
+.flux-legal a,.flux-legal-fecha a,.checkout-policies-note a,.checkout-policy-line a,.privacy-consent a,.privacy-link{color:var(--gold);font-weight:700;text-decoration:underline;text-underline-offset:3px}
+.flux-legal-fecha{margin:0 0 14px;color:#8d8897;font-size:11px;font-weight:700;letter-spacing:.06em}
+.shop-stock.is-info{color:#8fc7ff}
+.shop-stock.is-off{color:#8d8897}
+
+/* Historial de compras */
+.flux-historial-resumen{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:18px}
+.flux-historial-resumen div{padding:14px 16px;border:1px solid rgba(185,167,255,.2);background:rgba(21,15,34,.7)}
+.flux-historial-resumen span{display:block;color:#8d8897;font-size:9px;font-weight:900;letter-spacing:.14em}
+.flux-historial-resumen strong{display:block;margin-top:4px;font-family:"Barlow Condensed";font-size:30px;line-height:1}
+.flux-historial-tabla{overflow-x:auto;border:1px solid rgba(255,255,255,.08)}
+.flux-historial-tabla table{width:100%;min-width:640px;border-collapse:collapse;font-size:13px}
+.flux-historial-tabla th{padding:12px 14px;background:rgba(185,167,255,.08);color:var(--gold);font-size:9px;font-weight:900;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap}
+.flux-historial-tabla td{padding:14px;border-top:1px solid rgba(255,255,255,.06);color:#d8d0ee;vertical-align:top}
+.flux-historial-tabla td.font-monospace{color:#fff;white-space:nowrap}
+.flux-historial-tabla .shop-stock{white-space:nowrap}
+.flux-historial-total{font-family:"Barlow Condensed";font-size:20px;color:#fff !important;white-space:nowrap}
+
+/* Registro: Aviso de Privacidad y consentimiento expreso */
+.privacy-consent{display:flex;align-items:flex-start;gap:10px;margin-top:20px;padding:14px;border:1px solid rgba(185,167,255,.25);background:rgba(185,167,255,.06);border-radius:4px}
+.privacy-consent input{flex-shrink:0;width:18px;height:18px;margin-top:2px;accent-color:#b9a7ff;cursor:pointer}
+.privacy-consent label{color:#dfd8f0;font-size:12px;line-height:1.6;cursor:pointer}
+.privacy-link i{margin-right:2px}
+
+/* Carrito: acceso a políticas */
+.checkout-policies{margin-top:34px}
+.checkout-policies-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:16px}
+.policy-card{display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:20px;border:1px solid rgba(185,167,255,.25);background:rgba(21,15,34,.8);color:#fff;text-align:left;transition:.25s ease}
+.policy-card:hover{border-color:var(--gold);background:rgba(185,167,255,.1);transform:translateY(-2px)}
+.policy-card i{color:var(--gold);font-size:22px}
+.policy-card strong{font-family:"Barlow Condensed";font-size:22px;font-weight:800;line-height:1.1;text-transform:uppercase}
+.policy-card span{color:#a39db0;font-size:12px}
+.checkout-policies-note{margin:14px 0 0;color:#8d8897;font-size:12px}
+.checkout-policy-line{color:#a39db0}
+
+@media(max-width:700px){
+  .flux-modal .modal-header,.flux-modal .modal-body,.flux-modal .modal-footer{padding-left:18px;padding-right:18px}
+  .flux-modal .modal-footer .plan-button{flex:1 1 100%}
+  .flux-historial-resumen{grid-template-columns:1fr 1fr}
+  .flux-historial-resumen div:last-child{grid-column:1/-1}
+  .checkout-policies-grid{grid-template-columns:1fr}
+}
