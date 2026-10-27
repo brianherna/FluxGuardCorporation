@@ -1836,3 +1836,57 @@ select {
   .flux-historial-resumen div:last-child{grid-column:1/-1}
   .checkout-policies-grid{grid-template-columns:1fr}
 }
+
+/* ===== Reseñas post-compra: formulario de estrellas y carrusel ===== */
+.review-section{margin-top:40px;padding-top:30px;border-top:1px solid rgba(255,255,255,.08);text-align:left}
+.review-heading{margin:12px 0 6px;font-family:"Barlow Condensed";font-size:clamp(30px,4vw,40px);font-weight:900;line-height:.95;text-transform:uppercase}
+.review-sub{margin:0 0 18px;color:#a39db0;font-size:13px}
+.review-list{display:grid;gap:12px}
+.review-card{display:grid;gap:12px;padding:20px;border:1px solid rgba(185,167,255,.25);background:rgba(21,15,34,.8)}
+.review-card.is-done{border-color:rgba(88,224,160,.3)}
+.review-product{font-family:"Barlow Condensed";font-size:22px;font-weight:800;text-transform:uppercase}
+.review-stars{display:flex;align-items:center;flex-wrap:wrap;gap:2px}
+.review-stars button{display:grid;place-items:center;width:38px;height:38px;padding:0;border:0;background:transparent;color:#5d5670;font-size:24px;transition:transform .15s ease,color .15s ease}
+.review-stars button:hover{transform:scale(1.12)}
+.review-stars button.is-active{color:#ffc56b}
+.review-stars button:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
+.review-stars-text{margin-left:10px;color:#d8d0ee;font-size:12px;font-weight:700;letter-spacing:.04em}
+.review-stars-static{display:flex;gap:3px;color:#ffc56b;font-size:16px}
+.review-card textarea{width:100%;padding:12px 14px;border:1px solid rgba(185,167,255,.3);border-radius:4px;background:#150e24;color:#fff;font-size:14px;resize:vertical;outline:0}
+.review-card textarea:focus{border-color:var(--gold);box-shadow:0 0 10px rgba(185,167,255,.2)}
+.review-actions{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.review-actions .plan-button{width:auto;margin:0;padding:0 18px;min-height:42px}
+.review-count{color:#8d8897;font-size:11px}
+.review-feedback{min-height:0;color:#a39db0;font-size:12px}
+.review-feedback.is-error{color:#ff9aa8}
+.review-done{margin:0;color:#58e0a0;font-size:13px;font-weight:700}
+.review-carousel-window{overflow:hidden;border:1px solid rgba(185,167,255,.25);background:linear-gradient(135deg,rgba(28,18,48,.9),rgba(13,8,24,.95))}
+.review-carousel-track{display:flex;transition:transform .55s ease}
+.review-slide{flex:0 0 100%;margin:0;padding:30px 34px}
+.review-slide .review-stars-static{font-size:20px}
+.review-slide blockquote{margin:16px 0 18px;color:#fff;font-size:clamp(16px,2vw,20px);font-weight:500;line-height:1.55}
+.review-slide figcaption{color:#a39db0;font-size:12px}
+.review-slide figcaption strong{color:var(--gold)}
+.review-slide figcaption span{display:block;margin-top:4px;color:#6f6a79;font-size:11px}
+.review-carousel-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:14px}
+.review-carousel-controls>button{display:grid;place-items:center;width:40px;height:40px;border:1px solid rgba(185,167,255,.35);border-radius:3px;background:transparent;color:#fff;transition:.25s ease}
+.review-carousel-controls>button:hover{border-color:var(--gold);background:rgba(185,167,255,.12)}
+.review-carousel-dots{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+.review-carousel-dots button{width:8px;height:8px;padding:0;border:0;border-radius:50%;background:rgba(255,255,255,.25);transition:.25s ease}
+.review-carousel-dots button.active{width:22px;border-radius:4px;background:var(--gold)}
+.flux-opinar-btn{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border:1px solid rgba(255,197,107,.45);border-radius:3px;background:transparent;color:#ffc56b;font-size:9px;font-weight:900;letter-spacing:.12em;white-space:nowrap;transition:.25s ease}
+.flux-opinar-btn:hover{background:rgba(255,197,107,.12)}
+.flux-volver-btn{display:inline-flex;align-items:center;gap:8px;margin-bottom:4px;padding:0;border:0;background:transparent;color:#a39db0;font-size:10px;font-weight:900;letter-spacing:.12em}
+.flux-volver-btn:hover{color:#fff}
+.flux-modal .review-section{margin-top:12px;padding-top:0;border-top:0}
+
+@media(max-width:700px){
+  .review-slide{padding:22px 20px}
+  .review-actions{flex-direction:column;align-items:stretch}
+  .review-actions .plan-button{width:100%}
+  .review-stars button{width:34px;height:34px;font-size:22px}
+}
+.shop-reviews .review-section{margin-top:0;padding-top:0;border-top:0}
+.shop-reviews .review-carousel-window{max-width:900px}
+.shop-reviews .review-carousel-controls{max-width:900px}
+.shop-reviews[hidden]{display:none !important}

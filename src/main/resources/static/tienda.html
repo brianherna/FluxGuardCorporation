@@ -146,6 +146,9 @@
     </p>
   </section>
 
+  <!-- OPINIONES: carrusel de reseñas positivas, solo para quien no ha iniciado sesión -->
+  <div class="plans-section shop-reviews" id="tienda-resenas" hidden></div>
+
   <footer class="plans-footer">
     <span>FLUXGUARD / MONITOREA HOY, PROTEGE MAÑANA</span>
     <a href="contacto.html">SOLICITAR INFORMACIÓN <i class="bi bi-arrow-up-right"></i></a>
@@ -157,6 +160,13 @@
     document.addEventListener("DOMContentLoaded", initTienda);
 
     async function initTienda() {
+      // Sin sesión se muestran opiniones de otros clientes; no depende de que cargue el catálogo
+      if (!localStorage.getItem("fluxg_token")) {
+        const resenas = document.getElementById("tienda-resenas");
+        resenas.hidden = false;
+        mostrarCarruselResenas(resenas);
+      }
+
       const status = document.getElementById("shop-status");
       let productos = [];
       try {

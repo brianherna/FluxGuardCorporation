@@ -271,7 +271,10 @@
           </div>
           ${usuario?.suscripcion ? `<a href="dashboard.html" class="plan-button cart-checkout">IR A MI DASHBOARD <i class="bi bi-arrow-up-right ms-2"></i></a>` : ""}
           <a href="tienda.html" class="plan-button">SEGUIR COMPRANDO <i class="bi bi-arrow-up-right ms-2"></i></a>
+          <div id="resenas-post-compra" class="text-start"></div>
         </div>`;
+      // Con sesión: calificar lo que compró. Sin sesión: carrusel de reseñas positivas.
+      initResenasPostCompra(document.getElementById("resenas-post-compra"), pedido);
     }
   </script>
 </body>

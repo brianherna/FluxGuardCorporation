@@ -32,7 +32,7 @@ public class AuthController {
     private static final Duration ESPERA_REENVIO = Duration.ofSeconds(60);
     private static final String CREDENCIALES_INCORRECTAS = "Correo o contraseña incorrectos.";
     /** Versión vigente del Aviso de Privacidad (crear-cuenta.html). Cámbiala cuando se actualice el texto del aviso. */
-    public static final String VERSION_AVISO_PRIVACIDAD = "2026-10";
+    public static final String VERSION_AVISO_PRIVACIDAD = "2026-10-27";
     private static final String REENVIO_GENERICO = "Si hay una cuenta pendiente de verificación con ese correo, te enviamos un enlace nuevo.";
 
     private final UsuarioRepository usuarioRepository;
