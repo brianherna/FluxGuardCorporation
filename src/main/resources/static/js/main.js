@@ -976,7 +976,7 @@ function renderPanelCarrito(carrito) {
 // Cualquier elemento con data-sobrepantalla="privacidad" | "politicas" | "historial" abre la ventana.
 // En políticas, data-seccion="compra" | "envio" | "devoluciones" elige la pestaña inicial.
 
-const FLUXGUARD_CORREO = "contacto@fluxguard.io";
+const FLUXGUARD_CORREO = "fluxguardcorporation@gmail.com";
 const FLUXGUARD_DOMICILIO = "Paseo del Agrarismo 2000, Carr. Mixquiahuala–Tula km 2.5, Mixquiahuala de Juárez, Hidalgo, México";
 
 function initSobrepantallas() {
