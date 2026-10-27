@@ -10,6 +10,8 @@ public class ProspectoRequest {
     private String sector;
     private String interes;
     private String mensaje;
+    // Campo trampa: está oculto en el formulario; solo los robots lo llenan
+    private String sitioWeb;
 
     public ProspectoRequest() {}
 
@@ -83,5 +85,13 @@ public class ProspectoRequest {
 
     public void setMensaje(String mensaje) {
         this.mensaje = mensaje;
+    }
+
+    public String getSitioWeb() {
+        return sitioWeb;
+    }
+
+    public void setSitioWeb(String sitioWeb) {
+        this.sitioWeb = sitioWeb;
     }
 }

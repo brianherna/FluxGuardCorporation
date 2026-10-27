@@ -19,6 +19,15 @@ public class CorreoService {
         this.brevo = brevo;
     }
 
+    /** Envía un correo cualquiera con el proveedor activo. Lanza RestClientException si el proveedor lo rechaza. */
+    public void enviar(Correo correo) {
+        if (resend.estaConfigurado()) {
+            resend.enviar(correo);
+        } else {
+            brevo.enviar(correo);
+        }
+    }
+
     /** Envía el enlace de verificación. Lanza RestClientException si el proveedor rechaza el envío. */
     public void enviarEnlaceVerificacion(String correo, String nombre, String enlace, int horasVigencia) {
         if (resend.estaConfigurado()) {

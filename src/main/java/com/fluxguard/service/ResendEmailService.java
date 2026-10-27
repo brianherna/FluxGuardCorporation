@@ -10,6 +10,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -59,13 +60,22 @@ public class ResendEmailService {
 
     /** Envía el correo con el enlace de verificación. Lanza RestClientException si Resend rechaza el envío. */
     public void enviarEnlaceVerificacion(String correo, String nombre, String enlace, int horasVigencia) {
-        Map<String, Object> body = Map.of(
-                "from", remitente,
-                "to", List.of(correo),
-                "subject", PlantillaVerificacion.ASUNTO,
-                "html", PlantillaVerificacion.html(nombre, enlace, horasVigencia),
-                "text", PlantillaVerificacion.texto(nombre, enlace, horasVigencia)
-        );
+        enviar(new Correo(correo, nombre, PlantillaVerificacion.ASUNTO,
+                PlantillaVerificacion.html(nombre, enlace, horasVigencia),
+                PlantillaVerificacion.texto(nombre, enlace, horasVigencia), null));
+    }
+
+    /** Envía un correo cualquiera. Lanza RestClientException si Resend lo rechaza. */
+    public void enviar(Correo correo) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("from", remitente);
+        body.put("to", List.of(correo.para()));
+        body.put("subject", correo.asunto());
+        body.put("html", correo.html());
+        body.put("text", correo.texto());
+        if (correo.responderA() != null) {
+            body.put("reply_to", correo.responderA());
+        }
 
         try {
             restClient.post()
@@ -74,13 +84,13 @@ public class ResendEmailService {
                     .body(body)
                     .retrieve()
                     .toBodilessEntity();
-            log.info("[FluxG] Correo de verificación enviado con Resend a {}", correo);
+            log.info("[FluxG] Correo \"{}\" enviado con Resend a {}", correo.asunto(), correo.para());
         } catch (RestClientResponseException e) {
             // 403 suele ser dominio sin verificar; 401, API key incorrecta; 422, remitente o datos inválidos
-            log.error("[FluxG] Resend rechazó el correo a {} ({}): {}", correo, e.getStatusCode(), e.getResponseBodyAsString());
+            log.error("[FluxG] Resend rechazó el correo a {} ({}): {}", correo.para(), e.getStatusCode(), e.getResponseBodyAsString());
             throw e;
         } catch (RestClientException e) {
-            log.error("[FluxG] No se pudo conectar con Resend para enviar a {}: {}", correo, e.getMessage());
+            log.error("[FluxG] No se pudo conectar con Resend para enviar a {}: {}", correo.para(), e.getMessage());
             throw e;
         }
     }

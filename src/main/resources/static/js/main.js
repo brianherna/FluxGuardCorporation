@@ -11,6 +11,8 @@ const API_BASE = (window.location.hostname === "localhost" || window.location.ho
 (function() {
   // Versiones anteriores guardaban usuarios con su contraseña sin cifrar en el navegador: se borran siempre
   localStorage.removeItem("fluxg_usuarios");
+  // Versiones anteriores guardaban en el navegador los datos del formulario de contacto cuando fallaba el servidor
+  localStorage.removeItem("fluxg_prospectos");
   if (!localStorage.getItem("fluxg_v4_clean")) {
     localStorage.removeItem("usuario");
     localStorage.removeItem("fluxguard_active_subscription");
@@ -453,7 +455,9 @@ function initContactForm() {
       cargo: value("prospect-cargo"),
       sector: document.getElementById("prospect-sector")?.value || "",
       interes: document.getElementById("prospect-interes")?.value || "",
-      mensaje: value("prospect-mensaje")
+      mensaje: value("prospect-mensaje"),
+      // Campo trampa oculto: una persona nunca lo llena
+      sitioWeb: document.getElementById("prospect-sitio-web")?.value || ""
     };
 
     if (button) {
@@ -462,28 +466,21 @@ function initContactForm() {
     }
 
     try {
-      let data = null;
-      // 1. Intento con backend Spring Boot / MongoDB Atlas
-      try {
-        const response = await fetch(`${API_BASE}/api/prospectos`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload)
-        });
-        if (response.ok) {
-          data = await response.json();
-        }
-      } catch (_) {}
-
-      // 2. Fallback para GitHub Pages o modo demostración estática
-      if (!data || !data.success) {
-        const prospectos = JSON.parse(localStorage.getItem("fluxg_prospectos") || "[]");
-        prospectos.push({ ...payload, fecha: new Date().toISOString() });
-        localStorage.setItem("fluxg_prospectos", JSON.stringify(prospectos));
-        data = { success: true, message: "¡Gracias! Tu información y solicitud fueron registradas exitosamente." };
+      // Solo se confirma si el servidor guardó la solicitud: así nadie cree que lo contactarán cuando no fue así
+      const response = await fetch(`${API_BASE}/api/prospectos`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }).catch(() => null);
+      if (!response) {
+        throw new Error("No se pudo conectar con el servidor. Revisa tu conexión e intenta de nuevo.");
+      }
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) {
+        throw new Error(data?.message || "No se pudo enviar tu solicitud. Intenta de nuevo en unos momentos.");
       }
 
-      showAlert(alertBox, "success", data.message || "¡Gracias! Tu información fue registrada exitosamente.");
+      showAlert(alertBox, "success", escapeHtml(data.message || "Recibimos tu solicitud. Te contactaremos pronto."));
       form.reset();
 
       // Restaurar datos de sesión si existen
@@ -496,7 +493,7 @@ function initContactForm() {
         } catch (_) {}
       }
     } catch (error) {
-      showAlert(alertBox, "danger", error.message || "No se pudo conectar con el servidor.");
+      showAlert(alertBox, "danger", escapeHtml(error.message || "No se pudo conectar con el servidor."));
     } finally {
       if (button) {
         button.disabled = false;

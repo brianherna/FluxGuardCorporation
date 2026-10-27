@@ -191,6 +191,12 @@
           </div>
         </div>
 
+        <!-- Campo trampa contra robots: oculto para las personas, no lo llenes -->
+        <div aria-hidden="true" style="position:absolute; left:-10000px; width:1px; height:1px; overflow:hidden;">
+          <label for="prospect-sitio-web">Sitio web</label>
+          <input id="prospect-sitio-web" type="text" tabindex="-1" autocomplete="off">
+        </div>
+
         <!-- CONSENTIMIENTO -->
         <label class="d-flex align-items-center gap-2 mt-3 mb-4" style="cursor:pointer;">
           <input type="checkbox" id="prospect-acepta" required style="accent-color: var(--gold); width: 16px; height: 16px;">
