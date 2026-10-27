@@ -1,6 +1,7 @@
 package com.fluxguard.model;
 
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.Indexed;
 import org.springframework.data.mongodb.core.mapping.Document;
 
 import java.time.LocalDateTime;
@@ -10,6 +11,10 @@ public class Prospecto {
 
     @Id
     private String id;
+
+    /** Número de solicitud que se le da al cliente (p. ej. SOL-48213). */
+    @Indexed
+    private String folio;
 
     private String nombre;
     private String apellido;
@@ -126,5 +131,13 @@ public class Prospecto {
 
     public void setFechaRegistro(LocalDateTime fechaRegistro) {
         this.fechaRegistro = fechaRegistro;
+    }
+
+    public String getFolio() {
+        return folio;
+    }
+
+    public void setFolio(String folio) {
+        this.folio = folio;
     }
 }

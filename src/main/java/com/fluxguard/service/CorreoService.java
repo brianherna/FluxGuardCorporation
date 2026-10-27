@@ -20,6 +20,15 @@ public class CorreoService {
         this.brevo = brevo;
     }
 
+    /** Envía un correo cualquiera con el proveedor activo. Lanza RestClientException si el proveedor lo rechaza. */
+    public void enviar(Correo correo) {
+        if (resend.estaConfigurado()) {
+            resend.enviar(correo);
+        } else {
+            brevo.enviar(correo);
+        }
+    }
+
     /** Envía el enlace de verificación. Lanza RestClientException si el proveedor rechaza el envío. */
     public void enviarEnlaceVerificacion(String correo, String nombre, String enlace, int horasVigencia) {
         if (resend.estaConfigurado()) {
@@ -34,14 +43,8 @@ public class CorreoService {
      * Lanza RestClientException si el proveedor lo rechaza.
      */
     public void enviarTicket(Pedido pedido) {
-        String asunto = PlantillaTicket.asunto(pedido);
-        String html = PlantillaTicket.html(pedido);
-        String texto = PlantillaTicket.texto(pedido);
         Adjunto pdf = new Adjunto(TicketPdf.nombreArchivo(pedido), TicketPdf.generar(pedido));
-        if (resend.estaConfigurado()) {
-            resend.enviar(pedido.getCorreoCliente(), asunto, html, texto, pdf, "del ticket " + pedido.getFolio());
-        } else {
-            brevo.enviar(pedido.getCorreoCliente(), pedido.getNombreCliente(), asunto, html, texto, pdf, "del ticket " + pedido.getFolio());
-        }
+        enviar(new Correo(pedido.getCorreoCliente(), pedido.getNombreCliente(), PlantillaTicket.asunto(pedido),
+                PlantillaTicket.html(pedido), PlantillaTicket.texto(pedido), null, pdf));
     }
 }

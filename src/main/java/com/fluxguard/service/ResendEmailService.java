@@ -60,21 +60,24 @@ public class ResendEmailService {
 
     /** Envía el correo con el enlace de verificación. Lanza RestClientException si Resend rechaza el envío. */
     public void enviarEnlaceVerificacion(String correo, String nombre, String enlace, int horasVigencia) {
-        enviar(correo, PlantillaVerificacion.ASUNTO, PlantillaVerificacion.html(nombre, enlace, horasVigencia),
-                PlantillaVerificacion.texto(nombre, enlace, horasVigencia), null, "de verificación");
+        enviar(new Correo(correo, nombre, PlantillaVerificacion.ASUNTO,
+                PlantillaVerificacion.html(nombre, enlace, horasVigencia),
+                PlantillaVerificacion.texto(nombre, enlace, horasVigencia), null));
     }
 
-    /** Envía un correo cualquiera, con un adjunto opcional. Lanza RestClientException si Resend rechaza el envío. */
-    public void enviar(String correo, String asunto, String html, String texto, Adjunto adjunto, String descripcion) {
-        Map<String, Object> body = new HashMap<>(Map.of(
-                "from", remitente,
-                "to", List.of(correo),
-                "subject", asunto,
-                "html", html,
-                "text", texto
-        ));
-        if (adjunto != null) {
-            body.put("attachments", List.of(Map.of("filename", adjunto.nombre(), "content", adjunto.base64())));
+    /** Envía un correo cualquiera, con Reply-To y adjunto opcionales. Lanza RestClientException si Resend lo rechaza. */
+    public void enviar(Correo correo) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("from", remitente);
+        body.put("to", List.of(correo.para()));
+        body.put("subject", correo.asunto());
+        body.put("html", correo.html());
+        body.put("text", correo.texto());
+        if (correo.responderA() != null) {
+            body.put("reply_to", correo.responderA());
+        }
+        if (correo.adjunto() != null) {
+            body.put("attachments", List.of(Map.of("filename", correo.adjunto().nombre(), "content", correo.adjunto().base64())));
         }
 
         try {
@@ -84,13 +87,13 @@ public class ResendEmailService {
                     .body(body)
                     .retrieve()
                     .toBodilessEntity();
-            log.info("[FluxG] Correo {} enviado con Resend a {}", descripcion, correo);
+            log.info("[FluxG] Correo \"{}\" enviado con Resend a {}", correo.asunto(), correo.para());
         } catch (RestClientResponseException e) {
             // 403 suele ser dominio sin verificar; 401, API key incorrecta; 422, remitente o datos inválidos
-            log.error("[FluxG] Resend rechazó el correo a {} ({}): {}", correo, e.getStatusCode(), e.getResponseBodyAsString());
+            log.error("[FluxG] Resend rechazó el correo a {} ({}): {}", correo.para(), e.getStatusCode(), e.getResponseBodyAsString());
             throw e;
         } catch (RestClientException e) {
-            log.error("[FluxG] No se pudo conectar con Resend para enviar a {}: {}", correo, e.getMessage());
+            log.error("[FluxG] No se pudo conectar con Resend para enviar a {}: {}", correo.para(), e.getMessage());
             throw e;
         }
     }

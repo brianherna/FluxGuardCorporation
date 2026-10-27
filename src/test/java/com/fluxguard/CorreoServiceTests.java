@@ -1,8 +1,8 @@
 package com.fluxguard;
 
 import com.fluxguard.model.Pedido;
-import com.fluxguard.service.Adjunto;
 import com.fluxguard.service.BrevoEmailService;
+import com.fluxguard.service.Correo;
 import com.fluxguard.service.CorreoService;
 import com.fluxguard.service.PlantillaTicket;
 import com.fluxguard.service.PlantillaVerificacion;
@@ -74,17 +74,21 @@ class CorreoServiceTests {
         BrevoEmailService brevo = mock(BrevoEmailService.class);
         Pedido pedido = pedidoPagado();
 
-        // El PDF del ticket va adjunto
-        ArgumentMatcher<Adjunto> pdf = a -> a.nombre().equals("ticket-FLX-P48213377.pdf")
-                && new String(a.contenido(), 0, 5).equals("%PDF-");
+        // Va al cliente, con el folio en el asunto y el PDF del ticket adjunto
+        ArgumentMatcher<Correo> ticket = c -> c.para().equals("ana@test.com")
+                && c.nombrePara().equals("Ana López")
+                && c.asunto().contains("FLX-P48213377")
+                && c.adjunto() != null
+                && c.adjunto().nombre().equals("ticket-FLX-P48213377.pdf")
+                && new String(c.adjunto().contenido(), 0, 5).equals("%PDF-");
 
         when(resend.estaConfigurado()).thenReturn(false);
         new CorreoService(resend, brevo).enviarTicket(pedido);
-        verify(brevo).enviar(eq("ana@test.com"), eq("Ana López"), contains("FLX-P48213377"), anyString(), anyString(), argThat(pdf), anyString());
+        verify(brevo).enviar(argThat(ticket));
 
         when(resend.estaConfigurado()).thenReturn(true);
         new CorreoService(resend, brevo).enviarTicket(pedido);
-        verify(resend).enviar(eq("ana@test.com"), contains("FLX-P48213377"), anyString(), anyString(), argThat(pdf), anyString());
+        verify(resend).enviar(argThat(ticket));
     }
 
     @Test
