@@ -17,6 +17,7 @@ Plataforma web de monitoreo eléctrico IoT. Backend en Spring Boot 3.5 (Java 17)
 | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | Alternativa a Brevo: si `RESEND_API_KEY` tiene valor, los correos se envían con Resend. `RESEND_FROM_EMAIL` vacío usa `BREVO_SENDER_EMAIL` |
 | `CORS_ALLOWED_ORIGINS` | Dominios extra que pueden llamar a la API (separados por coma) |
 | `ADMIN_API_KEY` | Clave para `GET /api/prospectos` (encabezado `X-Admin-Key`). Vacía = deshabilitado |
+| `CONTACTO_CORREO_EQUIPO` | Correo que recibe el aviso de cada solicitud del formulario de contacto (y el "Responder a" del correo al cliente) |
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | Credenciales de la app de PayPal (pestaña Sandbox para pruebas) |
 | `PAYPAL_MODE` | `sandbox` (pagos de prueba, por defecto) o `live` (pagos reales) |
 | `PAYPAL_CURRENCY` | Moneda de cobro, por defecto `MXN` |
@@ -57,7 +58,7 @@ docker build -t fluxguard . && docker run --env-file .env -p 8080:8080 fluxguard
 | POST | `/api/pedidos/{folio}/confirmar?token=` | Confirma el pago (orden de PayPal o sesión de Stripe); si se completa activa el plan y vacía el carrito |
 | POST | `/api/pagos/stripe/webhook` | Aviso de Stripe (`checkout.session.completed`), verificado con `STRIPE_WEBHOOK_SECRET` |
 | POST | `/api/pedidos/{folio}/cancelar` | Marca el pedido como cancelado (el carrito se conserva) |
-| POST | `/api/prospectos` | Guarda el formulario de contacto |
+| POST | `/api/prospectos` | Guarda el formulario de contacto con un folio (`SOL-12345`), envía confirmación al cliente y aviso al equipo. Límite: 1 por correo cada 10 min y 5 por IP por hora |
 | GET | `/api/prospectos` | Lista prospectos (requiere `X-Admin-Key`) |
 | GET | `/api/health` | Estado del servicio |
 

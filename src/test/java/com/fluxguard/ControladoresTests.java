@@ -151,8 +151,8 @@ class ControladoresTests {
         ProspectoRepository repo = mock(ProspectoRepository.class);
         when(repo.findAllByOrderByFechaRegistroDesc()).thenReturn(List.of());
 
-        assertEquals(HttpStatus.FORBIDDEN, new ProspectoController(repo, "").obtenerProspectos("cualquiera").getStatusCode());
-        ProspectoController controller = new ProspectoController(repo, "clave-secreta");
+        assertEquals(HttpStatus.FORBIDDEN, new ProspectoController(repo, mock(com.fluxguard.service.CorreoService.class), new com.fluxguard.service.LimiteSolicitudes(), "", "").obtenerProspectos("cualquiera").getStatusCode());
+        ProspectoController controller = new ProspectoController(repo, mock(com.fluxguard.service.CorreoService.class), new com.fluxguard.service.LimiteSolicitudes(), "clave-secreta", "");
         assertEquals(HttpStatus.FORBIDDEN, controller.obtenerProspectos(null).getStatusCode());
         assertEquals(HttpStatus.FORBIDDEN, controller.obtenerProspectos("otra").getStatusCode());
         assertEquals(HttpStatus.OK, controller.obtenerProspectos("clave-secreta").getStatusCode());

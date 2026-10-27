@@ -9,6 +9,7 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -57,14 +58,32 @@ public class BrevoEmailService {
             log.warn("[FluxG] (modo desarrollo) Enlace de verificación para {}: {}", correo, enlace);
             return;
         }
+        enviar(new Correo(correo, nombre, PlantillaVerificacion.ASUNTO,
+                PlantillaVerificacion.html(nombre, enlace, horasVigencia),
+                PlantillaVerificacion.texto(nombre, enlace, horasVigencia), null));
+    }
 
-        Map<String, Object> body = Map.of(
-                "sender", Map.of("name", senderName, "email", senderEmail),
-                "to", List.of(Map.of("email", correo, "name", nombre)),
-                "subject", PlantillaVerificacion.ASUNTO,
-                "htmlContent", PlantillaVerificacion.html(nombre, enlace, horasVigencia),
-                "textContent", PlantillaVerificacion.texto(nombre, enlace, horasVigencia)
-        );
+    /** Envía un correo cualquiera. Sin configuración solo lo registra en la consola. Lanza RestClientException si Brevo lo rechaza. */
+    public void enviar(Correo correo) {
+        if (!estaConfigurado()) {
+            log.warn("[FluxG] (modo desarrollo) Correo para {}: \"{}\"", correo.para(), correo.asunto());
+            return;
+        }
+
+        Map<String, Object> destinatario = new HashMap<>();
+        destinatario.put("email", correo.para());
+        if (correo.nombrePara() != null && !correo.nombrePara().isBlank()) {
+            destinatario.put("name", correo.nombrePara());
+        }
+        Map<String, Object> body = new HashMap<>();
+        body.put("sender", Map.of("name", senderName, "email", senderEmail));
+        body.put("to", List.of(destinatario));
+        body.put("subject", correo.asunto());
+        body.put("htmlContent", correo.html());
+        body.put("textContent", correo.texto());
+        if (correo.responderA() != null) {
+            body.put("replyTo", Map.of("email", correo.responderA()));
+        }
 
         try {
             restClient.post()
@@ -73,12 +92,13 @@ public class BrevoEmailService {
                     .body(body)
                     .retrieve()
                     .toBodilessEntity();
-            log.info("[FluxG] Brevo aceptó el correo de verificación para {} (si no llega, revisa Transactional > Logs en Brevo)", correo);
+            log.info("[FluxG] Brevo aceptó el correo \"{}\" para {} (si no llega, revisa Transactional > Logs en Brevo)",
+                    correo.asunto(), correo.para());
         } catch (RestClientResponseException e) {
-            log.error("[FluxG] Brevo rechazó el correo a {} ({}): {}", correo, e.getStatusCode(), e.getResponseBodyAsString());
+            log.error("[FluxG] Brevo rechazó el correo a {} ({}): {}", correo.para(), e.getStatusCode(), e.getResponseBodyAsString());
             throw e;
         } catch (RestClientException e) {
-            log.error("[FluxG] No se pudo conectar con Brevo para enviar a {}: {}", correo, e.getMessage());
+            log.error("[FluxG] No se pudo conectar con Brevo para enviar a {}: {}", correo.para(), e.getMessage());
             throw e;
         }
     }
