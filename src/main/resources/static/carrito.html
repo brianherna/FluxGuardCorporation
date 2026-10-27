@@ -91,6 +91,8 @@
 
     // Métodos de pago que el servidor tiene configurados ("paypal", "stripe")
     let metodosPago = ["paypal"];
+    // Casilla de aceptación de políticas: se conserva aunque el resumen se vuelva a dibujar
+    let politicasAceptadas = false;
 
     async function initCheckoutCarrito() {
       // No hace falta iniciar sesión: sin sesión se paga como invitado
@@ -182,13 +184,16 @@
       box.innerHTML = `
         <div class="cart-lines">${lineasCarritoHtml(carrito)}</div>
         <div class="cart-total"><span>TOTAL · IVA INCLUIDO</span><strong>${dinero(carrito.total)}</strong></div>
+        <div class="privacy-consent checkout-consent">
+          <input type="checkbox" id="acepta-politicas"${politicasAceptadas ? " checked" : ""}>
+          <label for="acepta-politicas">
+            He leído y acepto las
+            <a href="#" data-sobrepantalla="politicas" data-seccion="compra">políticas de compra</a>,
+            <a href="#" data-sobrepantalla="politicas" data-seccion="envio">envío</a> y
+            <a href="#" data-sobrepantalla="politicas" data-seccion="devoluciones">devoluciones</a>.
+          </label>
+        </div>
         ${botones || `<p class="m-0">Los pagos no están disponibles en este momento.</p>`}
-        <p class="checkout-note checkout-policy-line">
-          <i class="bi bi-shield-check me-1"></i> Al continuar aceptas las
-          <a href="#" data-sobrepantalla="politicas" data-seccion="compra">políticas de compra</a>,
-          <a href="#" data-sobrepantalla="politicas" data-seccion="envio">envío</a> y
-          <a href="#" data-sobrepantalla="politicas" data-seccion="devoluciones">devoluciones</a>.
-        </p>
         ${gratis ? "" : `
         <p class="checkout-note">
           <i class="bi bi-info-circle me-1"></i> Modo de prueba: no se cobra dinero real.
@@ -199,6 +204,21 @@
       if (carrito.avisos?.length) showAlert(alertBox, "info", carrito.avisos.map(escapeHtml).join("<br>"));
       conectarLineasCarrito(box, carrito, alertBox);
       box.querySelectorAll("button[data-metodo]").forEach(b => b.addEventListener("click", iniciarPago));
+
+      // Los botones de pago se habilitan solo con la casilla de políticas marcada
+      box.querySelector("#acepta-politicas").addEventListener("change", event => {
+        politicasAceptadas = event.target.checked;
+        if (politicasAceptadas) alertBox.classList.add("d-none");
+        actualizarBotonesPago();
+      });
+      actualizarBotonesPago();
+    }
+
+    function actualizarBotonesPago() {
+      document.querySelectorAll("button[data-metodo]").forEach(b => {
+        b.disabled = !politicasAceptadas;
+        b.title = politicasAceptadas ? "" : "Marca la casilla de políticas para continuar";
+      });
     }
 
     async function iniciarPago(event) {
@@ -206,6 +226,9 @@
       const metodo = boton.dataset.metodo;
       const textoOriginal = boton.innerHTML;
       const alertBox = document.getElementById("checkout-alert");
+      if (!politicasAceptadas) {
+        return showAlert(alertBox, "danger", "Debes aceptar las políticas de compra, envío y devoluciones para continuar.");
+      }
       document.querySelectorAll("button[data-metodo]").forEach(b => b.disabled = true);
       boton.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> CONECTANDO CON ${metodo === "stripe" ? "STRIPE" : "PAYPAL"}...`;
       try {
@@ -226,7 +249,7 @@
         mostrarExito(data.pedido, data.usuario);
       } catch (error) {
         showAlert(alertBox, "danger", escapeHtml(error.message));
-        document.querySelectorAll("button[data-metodo]").forEach(b => b.disabled = false);
+        actualizarBotonesPago();
         boton.innerHTML = textoOriginal;
       }
     }
@@ -248,7 +271,10 @@
           </div>
           ${usuario?.suscripcion ? `<a href="dashboard.html" class="plan-button cart-checkout">IR A MI DASHBOARD <i class="bi bi-arrow-up-right ms-2"></i></a>` : ""}
           <a href="tienda.html" class="plan-button">SEGUIR COMPRANDO <i class="bi bi-arrow-up-right ms-2"></i></a>
+          <div id="resenas-post-compra" class="text-start"></div>
         </div>`;
+      // Con sesión: calificar lo que compró. Sin sesión: carrusel de reseñas positivas.
+      initResenasPostCompra(document.getElementById("resenas-post-compra"), pedido);
     }
   </script>
 </body>

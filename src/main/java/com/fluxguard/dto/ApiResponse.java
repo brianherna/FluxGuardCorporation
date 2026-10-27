@@ -19,6 +19,8 @@ public class ApiResponse<T> {
     private CarritoDto carrito;
     private Pedido pedido;
     private List<Pedido> pedidos;
+    private ResenaDto resena;
+    private List<ResenaDto> resenas;
     private List<Producto> productos;
     private String urlPago;
     private List<String> metodosPago;
@@ -148,5 +150,21 @@ public class ApiResponse<T> {
 
     public void setPedidos(List<Pedido> pedidos) {
         this.pedidos = pedidos;
+    }
+
+    public ResenaDto getResena() {
+        return resena;
+    }
+
+    public void setResena(ResenaDto resena) {
+        this.resena = resena;
+    }
+
+    public List<ResenaDto> getResenas() {
+        return resenas;
+    }
+
+    public void setResenas(List<ResenaDto> resenas) {
+        this.resenas = resenas;
     }
 }

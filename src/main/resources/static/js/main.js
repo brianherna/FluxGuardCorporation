@@ -973,7 +973,7 @@ function renderPanelCarrito(carrito) {
 // Cualquier elemento con data-sobrepantalla="privacidad" | "politicas" | "historial" abre la ventana.
 // En políticas, data-seccion="compra" | "envio" | "devoluciones" elige la pestaña inicial.
 
-const FLUXGUARD_CORREO = "contacto@fluxguard.io";
+const FLUXGUARD_CORREO = "fluxguardcorporation@gmail.com";
 const FLUXGUARD_DOMICILIO = "Paseo del Agrarismo 2000, Carr. Mixquiahuala–Tula km 2.5, Mixquiahuala de Juárez, Hidalgo, México";
 
 function initSobrepantallas() {
@@ -1029,7 +1029,7 @@ function cerrarSobrepantalla() {
 // --- Aviso de Privacidad Integral ---
 // Si cambias el texto, actualiza también AuthController.VERSION_AVISO_PRIVACIDAD para registrar la nueva versión.
 const AVISO_PRIVACIDAD_HTML = `
-  <p class="flux-legal-fecha">Última actualización: octubre de 2026</p>
+  <p class="flux-legal-fecha">Última actualización: 27 de octubre de 2026</p>
 
   <h3>1. Identidad y domicilio del responsable</h3>
   <p>FluxGuard, con domicilio en ${FLUXGUARD_DOMICILIO}, es responsable del uso y protección de tus datos personales, conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares. Para cualquier asunto relacionado con este aviso escríbenos a <a href="mailto:${FLUXGUARD_CORREO}">${FLUXGUARD_CORREO}</a>.</p>
@@ -1039,6 +1039,7 @@ const AVISO_PRIVACIDAD_HTML = `
     <li><strong>Identificación y contacto:</strong> nombre, apellido y correo electrónico. Si usas el formulario de contacto, también teléfono, empresa, cargo y sector.</li>
     <li><strong>Cuenta:</strong> contraseña (se guarda cifrada y nadie en FluxGuard puede leerla), fecha de registro y fecha en que aceptaste este aviso.</li>
     <li><strong>Compras:</strong> productos, cantidades, montos, folios, fechas y estado de cada pedido. Si compras sin cuenta, el nombre y correo que te solicite PayPal.</li>
+    <li><strong>Reseñas:</strong> la calificación y el comentario que decidas publicar sobre un producto que compraste. Junto a tu reseña mostramos públicamente solo tu nombre y la inicial de tu apellido.</li>
   </ul>
   <p><strong>No guardamos datos de tarjetas.</strong> Los pagos se capturan directamente en las páginas de PayPal o Stripe. Tampoco recabamos datos personales sensibles.</p>
 
@@ -1049,6 +1050,7 @@ const AVISO_PRIVACIDAD_HTML = `
     <li>Procesar tus compras, pagos, envíos, garantías, cambios y devoluciones.</li>
     <li>Activar y prestar el plan de monitoreo que contrates.</li>
     <li>Atender tus solicitudes de información y soporte técnico.</li>
+    <li>Publicar las reseñas que escribas sobre tus compras.</li>
   </ul>
   <p><strong>Finalidades secundarias</strong> (no son necesarias para el servicio): enviarte información de nuevos productos, promociones y encuestas de satisfacción. Si no quieres que usemos tus datos para esto, escríbenos a <a href="mailto:${FLUXGUARD_CORREO}">${FLUXGUARD_CORREO}</a>. Negarte no afecta los servicios que contrates.</p>
 
@@ -1248,7 +1250,7 @@ async function abrirHistorialCompras() {
     <div class="flux-historial-tabla">
       <table>
         <thead>
-          <tr><th>Folio</th><th>Fecha</th><th>Productos</th><th>Método</th><th>Estado</th><th class="text-end">Total</th></tr>
+          <tr><th>Folio</th><th>Fecha</th><th>Productos</th><th>Método</th><th>Estado</th><th class="text-end">Total</th><th><span class="visually-hidden">Opinión</span></th></tr>
         </thead>
         <tbody>
           ${pedidos.map(p => {
@@ -1262,10 +1264,226 @@ async function abrirHistorialCompras() {
                 <td>${escapeHtml(nombreMetodoPago(p.metodoPago))}</td>
                 <td><span class="shop-stock ${estado.clase}">${estado.texto}</span></td>
                 <td class="text-end flux-historial-total">${dinero(p.total)}</td>
+                <td>${p.estado === "PAGADO" ? `<button type="button" class="flux-opinar-btn" data-opinar="${escapeHtml(p.folio)}"><i class="bi bi-star"></i> OPINAR</button>` : ""}</td>
               </tr>`;
           }).join("")}
         </tbody>
       </table>
     </div>
     <p class="flux-legal-fecha mt-3 mb-0">¿Dudas con un pedido? Escríbenos a <a href="mailto:${FLUXGUARD_CORREO}">${FLUXGUARD_CORREO}</a> con tu folio. Consulta las <a href="#" data-sobrepantalla="politicas" data-seccion="devoluciones">políticas de devolución</a>.</p>`;
+
+  // "Opinar" cambia el contenido de la ventana por el formulario de reseñas de ese pedido
+  cuerpo.querySelectorAll("[data-opinar]").forEach(boton => boton.addEventListener("click", () => {
+    const pedido = pedidos.find(p => p.folio === boton.dataset.opinar);
+    document.getElementById("fluxModalTitulo").textContent = "Califica tu compra";
+    cuerpo.innerHTML = `
+      <button type="button" class="flux-volver-btn" id="fluxVolverHistorial"><i class="bi bi-arrow-left"></i> VOLVER AL HISTORIAL</button>
+      <div id="fluxResenasPedido"></div>`;
+    cuerpo.scrollTop = 0;
+    cuerpo.querySelector("#fluxVolverHistorial").addEventListener("click", abrirHistorialCompras);
+    mostrarFormularioResenas(cuerpo.querySelector("#fluxResenasPedido"), pedido);
+  }));
+}
+
+
+// ===== Reseñas post-compra =====
+// Con sesión: formulario de estrellas y comentario por cada producto del pedido pagado.
+// Sin sesión: solo un carrusel con reseñas positivas de otros clientes.
+
+const TEXTO_ESTRELLAS = ["", "Muy malo", "Malo", "Regular", "Bueno", "Excelente"];
+
+function estrellasHtml(calificacion) {
+  return Array.from({ length: 5 }, (_, i) =>
+    `<i class="bi ${i < calificacion ? "bi-star-fill" : "bi-star"}"></i>`).join("");
+}
+
+// Decide qué mostrar después de una compra confirmada
+function initResenasPostCompra(contenedor, pedido) {
+  if (!contenedor) return;
+  if (localStorage.getItem("fluxg_token")) mostrarFormularioResenas(contenedor, pedido);
+  else mostrarCarruselResenas(contenedor);
+}
+
+async function mostrarFormularioResenas(contenedor, pedido) {
+  // Un formulario por producto (sin repetir) del pedido
+  const productos = [];
+  (pedido?.lineas || []).forEach(l => {
+    if (!productos.some(p => p.productoId === l.productoId)) productos.push(l);
+  });
+  if (!productos.length) return;
+
+  let yaCalificados = new Map();
+  try {
+    const response = await apiFetch("/api/resenas/mias");
+    const data = await response.json().catch(() => null);
+    if (response.status === 401) return mostrarCarruselResenas(contenedor);
+    if (response.ok && data?.success) yaCalificados = new Map((data.resenas || []).map(r => [r.productoId, r]));
+  } catch (_) {}
+
+  contenedor.innerHTML = `
+    <section class="review-section">
+      <span class="section-eyebrow"><span></span> TU OPINIÓN</span>
+      <h3 class="review-heading">¿Qué te pareció tu compra?</h3>
+      <p class="review-sub">Califica cada producto. Publicaremos tu nombre y la inicial de tu apellido junto a tu opinión.</p>
+      <div class="review-list">
+        ${productos.map(l => yaCalificados.has(l.productoId)
+          ? resenaEnviadaHtml(l.nombre, yaCalificados.get(l.productoId).calificacion, "Ya calificaste este producto.")
+          : `
+          <form class="review-card" data-producto="${escapeHtml(l.productoId)}" data-nombre="${escapeHtml(l.nombre)}" novalidate>
+            <strong class="review-product">${escapeHtml(l.nombre)}</strong>
+            <div class="review-stars" role="radiogroup" aria-label="Calificación de ${escapeHtml(l.nombre)}">
+              ${[1, 2, 3, 4, 5].map(n => `
+                <button type="button" role="radio" aria-checked="false" data-valor="${n}" aria-label="${n} ${n === 1 ? "estrella" : "estrellas"}: ${TEXTO_ESTRELLAS[n]}">
+                  <i class="bi bi-star"></i>
+                </button>`).join("")}
+              <span class="review-stars-text" aria-live="polite">Elige de 1 a 5 estrellas</span>
+            </div>
+            <textarea maxlength="500" rows="3" placeholder="Cuéntanos tu experiencia (opcional)" aria-label="Comentario sobre ${escapeHtml(l.nombre)}"></textarea>
+            <div class="review-actions">
+              <small class="review-count">0 / 500</small>
+              <button type="submit" class="plan-button cart-checkout">PUBLICAR OPINIÓN <i class="bi bi-send"></i></button>
+            </div>
+            <div class="review-feedback" aria-live="polite"></div>
+          </form>`).join("")}
+      </div>
+    </section>`;
+
+  contenedor.querySelectorAll("form.review-card").forEach(form => conectarFormularioResena(form, pedido.folio));
+}
+
+function resenaEnviadaHtml(nombre, calificacion, mensaje) {
+  return `
+    <div class="review-card is-done">
+      <strong class="review-product">${escapeHtml(nombre)}</strong>
+      <div class="review-stars-static" aria-label="${calificacion} de 5 estrellas">${estrellasHtml(calificacion)}</div>
+      <p class="review-done"><i class="bi bi-check2-circle"></i> ${escapeHtml(mensaje)}</p>
+    </div>`;
+}
+
+function conectarFormularioResena(form, folio) {
+  const estrellas = [...form.querySelectorAll("[data-valor]")];
+  const textoEstrellas = form.querySelector(".review-stars-text");
+  const comentario = form.querySelector("textarea");
+  const contador = form.querySelector(".review-count");
+  const feedback = form.querySelector(".review-feedback");
+  let calificacion = 0;
+
+  const pintar = valor => estrellas.forEach(b => {
+    const activa = Number(b.dataset.valor) <= valor;
+    b.classList.toggle("is-active", activa);
+    b.querySelector("i").className = `bi ${activa ? "bi-star-fill" : "bi-star"}`;
+  });
+
+  estrellas.forEach(boton => {
+    boton.addEventListener("mouseenter", () => pintar(Number(boton.dataset.valor)));
+    boton.addEventListener("click", () => {
+      calificacion = Number(boton.dataset.valor);
+      estrellas.forEach(b => b.setAttribute("aria-checked", String(b === boton)));
+      textoEstrellas.textContent = TEXTO_ESTRELLAS[calificacion];
+      feedback.textContent = "";
+      pintar(calificacion);
+    });
+  });
+  form.querySelector(".review-stars").addEventListener("mouseleave", () => pintar(calificacion));
+  comentario.addEventListener("input", () => contador.textContent = `${comentario.value.length} / 500`);
+
+  form.addEventListener("submit", async event => {
+    event.preventDefault();
+    if (!calificacion) {
+      feedback.className = "review-feedback is-error";
+      feedback.textContent = "Elige de 1 a 5 estrellas antes de publicar.";
+      return;
+    }
+    const boton = form.querySelector("button[type=submit]");
+    const textoOriginal = boton.innerHTML;
+    boton.disabled = true;
+    boton.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> PUBLICANDO...`;
+    try {
+      const response = await apiFetch("/api/resenas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folio, productoId: form.dataset.producto, calificacion, comentario: comentario.value.trim() })
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.success) throw new Error(data?.message || "No se pudo publicar tu opinión.");
+      form.outerHTML = resenaEnviadaHtml(form.dataset.nombre, calificacion, "¡Gracias por tu opinión!");
+    } catch (error) {
+      feedback.className = "review-feedback is-error";
+      feedback.textContent = error.message;
+      boton.disabled = false;
+      boton.innerHTML = textoOriginal;
+    }
+  });
+}
+
+async function mostrarCarruselResenas(contenedor) {
+  let resenas = [];
+  try {
+    const response = await fetch(`${API_BASE}/api/resenas/destacadas`);
+    const data = await response.json().catch(() => null);
+    if (response.ok && data?.success) resenas = data.resenas || [];
+  } catch (_) {}
+
+  const encabezado = `
+    <span class="section-eyebrow"><span></span> OPINIONES DE CLIENTES</span>
+    <h3 class="review-heading">Lo que dicen de FluxGuard</h3>`;
+  if (!resenas.length) {
+    contenedor.innerHTML = `
+      <section class="review-section">${encabezado}
+        <p class="review-sub mb-0">Aún no hay opiniones publicadas. ¡Pronto verás aquí la experiencia de nuestros clientes!</p>
+      </section>`;
+    return;
+  }
+
+  // "octubre de 2026" → "Octubre de 2026"
+  const fecha = valor => {
+    if (!valor) return "";
+    const texto = new Date(valor).toLocaleDateString("es-MX", { month: "long", year: "numeric" });
+    return texto.charAt(0).toUpperCase() + texto.slice(1);
+  };
+  contenedor.innerHTML = `
+    <section class="review-section review-carousel" aria-roledescription="carrusel" aria-label="Reseñas de clientes">
+      ${encabezado}
+      <div class="review-carousel-window">
+        <div class="review-carousel-track">
+          ${resenas.map((r, i) => `
+            <figure class="review-slide" role="group" aria-roledescription="reseña" aria-label="${i + 1} de ${resenas.length}">
+              <div class="review-stars-static" aria-label="${r.calificacion} de 5 estrellas">${estrellasHtml(r.calificacion)}</div>
+              <blockquote>&ldquo;${escapeHtml(r.comentario)}&rdquo;</blockquote>
+              <figcaption><strong>${escapeHtml(r.autor)}</strong> · ${escapeHtml(r.productoNombre)}<span>${escapeHtml(fecha(r.fecha))}</span></figcaption>
+            </figure>`).join("")}
+        </div>
+      </div>
+      ${resenas.length > 1 ? `
+      <div class="review-carousel-controls">
+        <button type="button" data-mover="-1" aria-label="Reseña anterior"><i class="bi bi-arrow-left"></i></button>
+        <div class="review-carousel-dots">${resenas.map((_, i) => `<button type="button" data-ir="${i}" aria-label="Ver reseña ${i + 1}"></button>`).join("")}</div>
+        <button type="button" data-mover="1" aria-label="Reseña siguiente"><i class="bi bi-arrow-right"></i></button>
+      </div>` : ""}
+    </section>`;
+
+  if (resenas.length < 2) return;
+  const seccion = contenedor.querySelector(".review-carousel");
+  const track = seccion.querySelector(".review-carousel-track");
+  const puntos = [...seccion.querySelectorAll("[data-ir]")];
+  let indice = 0;
+  let timer = null;
+  const ir = siguiente => {
+    indice = (siguiente + resenas.length) % resenas.length;
+    track.style.transform = `translateX(-${indice * 100}%)`;
+    puntos.forEach((p, i) => {
+      p.classList.toggle("active", i === indice);
+      p.setAttribute("aria-current", i === indice ? "true" : "false");
+    });
+  };
+  const reiniciar = () => {
+    clearInterval(timer);
+    timer = setInterval(() => ir(indice + 1), 6000);
+  };
+  seccion.querySelectorAll("[data-mover]").forEach(b => b.addEventListener("click", () => { ir(indice + Number(b.dataset.mover)); reiniciar(); }));
+  puntos.forEach(p => p.addEventListener("click", () => { ir(Number(p.dataset.ir)); reiniciar(); }));
+  seccion.addEventListener("mouseenter", () => clearInterval(timer));
+  seccion.addEventListener("mouseleave", reiniciar);
+  ir(0);
+  reiniciar();
 }
