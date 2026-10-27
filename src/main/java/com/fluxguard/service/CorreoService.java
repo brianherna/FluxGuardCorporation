@@ -1,5 +1,6 @@
 package com.fluxguard.service;
 
+import com.fluxguard.model.Pedido;
 import org.springframework.stereotype.Service;
 
 /**
@@ -25,6 +26,22 @@ public class CorreoService {
             resend.enviarEnlaceVerificacion(correo, nombre, enlace, horasVigencia);
         } else {
             brevo.enviarEnlaceVerificacion(correo, nombre, enlace, horasVigencia);
+        }
+    }
+
+    /**
+     * Envía el ticket de un pedido pagado al correo del cliente, con el PDF adjunto.
+     * Lanza RestClientException si el proveedor lo rechaza.
+     */
+    public void enviarTicket(Pedido pedido) {
+        String asunto = PlantillaTicket.asunto(pedido);
+        String html = PlantillaTicket.html(pedido);
+        String texto = PlantillaTicket.texto(pedido);
+        Adjunto pdf = new Adjunto(TicketPdf.nombreArchivo(pedido), TicketPdf.generar(pedido));
+        if (resend.estaConfigurado()) {
+            resend.enviar(pedido.getCorreoCliente(), asunto, html, texto, pdf, "del ticket " + pedido.getFolio());
+        } else {
+            brevo.enviar(pedido.getCorreoCliente(), pedido.getNombreCliente(), asunto, html, texto, pdf, "del ticket " + pedido.getFolio());
         }
     }
 }

@@ -9,6 +9,7 @@ import com.fluxguard.repository.UsuarioRepository;
 import com.fluxguard.service.CarritoService;
 import com.fluxguard.service.CatalogoService;
 import com.fluxguard.service.Comprador;
+import com.fluxguard.service.CorreoService;
 import com.fluxguard.service.PagoService;
 import com.fluxguard.service.PagoService.PagoNoDisponibleException;
 import com.fluxguard.service.PayPalService;
@@ -32,6 +33,7 @@ class PagoServiceTests {
 
     private PayPalService payPal;
     private StripeService stripe;
+    private CorreoService correoService;
     private CarritoService carritoService;
     private PagoService pagoService;
     private Carrito carrito;
@@ -46,6 +48,7 @@ class PagoServiceTests {
         UsuarioRepository usuarioRepository = mock(UsuarioRepository.class);
         payPal = mock(PayPalService.class);
         stripe = mock(StripeService.class);
+        correoService = mock(CorreoService.class);
 
         usuario = new Usuario("Ana", "Lopez", "ana@fluxguard.io", "hash");
         usuario.setId("u1");
@@ -69,7 +72,7 @@ class PagoServiceTests {
         when(payPal.crearOrden(any())).thenReturn(new Orden("ORDEN123", "https://www.sandbox.paypal.com/checkoutnow?token=ORDEN123"));
 
         carritoService = new CarritoService(carritoRepository, pedidoRepository, new CatalogoService());
-        pagoService = new PagoService(carritoService, payPal, stripe, pedidoRepository, usuarioRepository, new SuscripcionService());
+        pagoService = new PagoService(carritoService, payPal, stripe, pedidoRepository, usuarioRepository, new SuscripcionService(), correoService);
     }
 
     private Pedido iniciarConKitYPlan() {
@@ -95,9 +98,22 @@ class PagoServiceTests {
         assertEquals(pedido.getFolio(), usuario.getSuscripcion().getTransaccionId());
         assertTrue(carrito.getItems().isEmpty());
 
-        // Recargar la página no vuelve a cobrar
+        // Recargar la página no vuelve a cobrar ni a enviar el ticket
         pagoService.confirmar(pedido, "ORDEN123");
         verify(payPal, times(1)).capturar("ORDEN123");
+        verify(correoService, times(1)).enviarTicket(pedido);
+    }
+
+    @Test
+    void siElCorreoDelTicketFallaElPagoSigueConfirmado() {
+        Pedido pedido = iniciarConKitYPlan();
+        when(payPal.capturar("ORDEN123")).thenReturn(new Captura("CAP1", "COMPLETED", new BigDecimal("849.00"), "MXN"));
+        doThrow(new org.springframework.web.client.RestClientException("sin conexión")).when(correoService).enviarTicket(any());
+
+        pagoService.confirmar(pedido, "ORDEN123");
+
+        assertEquals(Pedido.PAGADO, pedido.getEstado());
+        assertEquals("standard", usuario.getSuscripcion().getTipo());
     }
 
     @Test
@@ -110,6 +126,7 @@ class PagoServiceTests {
         assertEquals(Pedido.PENDIENTE, pedido.getEstado());
         assertNull(usuario.getSuscripcion());
         assertFalse(carrito.getItems().isEmpty());
+        verify(correoService, never()).enviarTicket(any());
     }
 
     @Test
