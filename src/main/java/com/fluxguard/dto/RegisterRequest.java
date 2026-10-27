@@ -5,6 +5,8 @@ public class RegisterRequest {
     private String apellido;
     private String email;
     private String password;
+    /** Casilla "He leído y acepto el Aviso de Privacidad": sin ella no se crea la cuenta. */
+    private Boolean aceptaPrivacidad;
 
     public RegisterRequest() {}
 
@@ -38,5 +40,13 @@ public class RegisterRequest {
 
     public void setPassword(String password) {
         this.password = password;
+    }
+
+    public Boolean getAceptaPrivacidad() {
+        return aceptaPrivacidad;
+    }
+
+    public void setAceptaPrivacidad(Boolean aceptaPrivacidad) {
+        this.aceptaPrivacidad = aceptaPrivacidad;
     }
 }

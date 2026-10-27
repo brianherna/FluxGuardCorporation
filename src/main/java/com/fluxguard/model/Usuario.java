@@ -29,6 +29,10 @@ public class Usuario {
 
     private Suscripcion suscripcion;
 
+    // Consentimiento expreso del Aviso de Privacidad: cuándo se aceptó y qué versión del aviso
+    private LocalDateTime privacidadAceptadaEn;
+    private String versionAvisoPrivacidad;
+
     public Usuario() {
         this.fechaRegistro = LocalDateTime.now();
     }
@@ -132,5 +136,21 @@ public class Usuario {
 
     public void setSuscripcion(Suscripcion suscripcion) {
         this.suscripcion = suscripcion;
+    }
+
+    public LocalDateTime getPrivacidadAceptadaEn() {
+        return privacidadAceptadaEn;
+    }
+
+    public void setPrivacidadAceptadaEn(LocalDateTime privacidadAceptadaEn) {
+        this.privacidadAceptadaEn = privacidadAceptadaEn;
+    }
+
+    public String getVersionAvisoPrivacidad() {
+        return versionAvisoPrivacidad;
+    }
+
+    public void setVersionAvisoPrivacidad(String versionAvisoPrivacidad) {
+        this.versionAvisoPrivacidad = versionAvisoPrivacidad;
     }
 }

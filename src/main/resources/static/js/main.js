@@ -126,6 +126,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initAuthForms();
   initPlanes();
   initCarrito();
+  initSobrepantallas();
 });
 
 function initNavbar() {
@@ -172,6 +173,7 @@ function initNavbarAuth() {
         <ul class="dropdown-menu dropdown-menu-end dropdown-menu-dark">
           <li><h6 class="dropdown-header">${correo}</h6></li>
           <li><a class="dropdown-item fw-bold text-warning" href="dashboard.html"><i class="bi bi-speedometer2 me-2"></i>Mi Dashboard IoT</a></li>
+          <li><button class="dropdown-item" type="button" data-sobrepantalla="historial"><i class="bi bi-receipt me-2"></i>Mis compras</button></li>
           <li><a class="dropdown-item" href="planes.html"><i class="bi bi-grid me-2"></i>Planes</a></li>
           <li><a class="dropdown-item" href="contacto.html"><i class="bi bi-chat-left-dots me-2"></i>Contacto</a></li>
           <li><hr class="dropdown-divider"></li>
@@ -662,6 +664,12 @@ function initAuthForms() {
       const pwdError = validarPassword(password);
       if (pwdError) return showAlert(alertBox, "danger", pwdError);
 
+      // Consentimiento expreso: el servidor también rechaza el registro sin él
+      const aceptaPrivacidad = document.getElementById("reg-privacidad")?.checked === true;
+      if (!aceptaPrivacidad) {
+        return showAlert(alertBox, "danger", "Debes leer y aceptar el Aviso de Privacidad para crear tu cuenta.");
+      }
+
       if (button) {
         button.disabled = true;
         button.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> CREANDO CUENTA...`;
@@ -676,7 +684,8 @@ function initAuthForms() {
             nombre: get("reg-nombre"),
             apellido: get("reg-apellido"),
             email: email,
-            password: password
+            password: password,
+            aceptaPrivacidad
           })
         }).catch(() => null);
         if (!response) {
@@ -961,4 +970,305 @@ function renderPanelCarrito(carrito) {
   const alertBox = document.getElementById("carritoPanelAlert");
   if (carrito.avisos?.length) showAlert(alertBox, "info", carrito.avisos.map(escapeHtml).join("<br>"));
   conectarLineasCarrito(body, carrito, alertBox);
+}
+
+// ===== Sobrepantallas: Aviso de Privacidad, Políticas de compra e Historial de compras =====
+// Cualquier elemento con data-sobrepantalla="privacidad" | "politicas" | "historial" abre la ventana.
+// En políticas, data-seccion="compra" | "envio" | "devoluciones" elige la pestaña inicial.
+
+const FLUXGUARD_CORREO = "contacto@fluxguard.io";
+const FLUXGUARD_DOMICILIO = "Paseo del Agrarismo 2000, Carr. Mixquiahuala–Tula km 2.5, Mixquiahuala de Juárez, Hidalgo, México";
+
+function initSobrepantallas() {
+  document.addEventListener("click", event => {
+    const disparador = event.target.closest("[data-sobrepantalla]");
+    if (!disparador) return;
+    event.preventDefault();
+    const tipo = disparador.dataset.sobrepantalla;
+    if (tipo === "privacidad") abrirAvisoPrivacidad();
+    else if (tipo === "politicas") abrirPoliticas(disparador.dataset.seccion);
+    else if (tipo === "historial") abrirHistorialCompras();
+  });
+}
+
+// Una sola ventana modal de Bootstrap que se reutiliza para todo el contenido
+function abrirSobrepantalla({ kicker, titulo, cuerpo, pie }) {
+  let modal = document.getElementById("fluxModal");
+  if (!modal) {
+    document.body.insertAdjacentHTML("beforeend", `
+      <div class="modal fade flux-modal" id="fluxModal" tabindex="-1" aria-labelledby="fluxModalTitulo" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable modal-lg">
+          <div class="modal-content">
+            <div class="modal-header">
+              <div>
+                <span class="flux-modal-kicker" id="fluxModalKicker"></span>
+                <h2 class="modal-title" id="fluxModalTitulo"></h2>
+              </div>
+              <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+            </div>
+            <div class="modal-body" id="fluxModalCuerpo"></div>
+            <div class="modal-footer" id="fluxModalPie"></div>
+          </div>
+        </div>
+      </div>`);
+    modal = document.getElementById("fluxModal");
+  }
+  const cuerpoEl = document.getElementById("fluxModalCuerpo");
+  const pieEl = document.getElementById("fluxModalPie");
+  document.getElementById("fluxModalKicker").textContent = kicker;
+  document.getElementById("fluxModalTitulo").textContent = titulo;
+  cuerpoEl.innerHTML = cuerpo;
+  cuerpoEl.scrollTop = 0;
+  pieEl.innerHTML = pie || `<button type="button" class="plan-button" data-bs-dismiss="modal">CERRAR</button>`;
+  bootstrap.Modal.getOrCreateInstance(modal).show();
+  return { modal, cuerpo: cuerpoEl, pie: pieEl };
+}
+
+function cerrarSobrepantalla() {
+  const modal = document.getElementById("fluxModal");
+  if (modal) bootstrap.Modal.getOrCreateInstance(modal).hide();
+}
+
+// --- Aviso de Privacidad Integral ---
+// Si cambias el texto, actualiza también AuthController.VERSION_AVISO_PRIVACIDAD para registrar la nueva versión.
+const AVISO_PRIVACIDAD_HTML = `
+  <p class="flux-legal-fecha">Última actualización: octubre de 2026</p>
+
+  <h3>1. Identidad y domicilio del responsable</h3>
+  <p>FluxGuard, con domicilio en ${FLUXGUARD_DOMICILIO}, es responsable del uso y protección de tus datos personales, conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares. Para cualquier asunto relacionado con este aviso escríbenos a <a href="mailto:${FLUXGUARD_CORREO}">${FLUXGUARD_CORREO}</a>.</p>
+
+  <h3>2. Datos personales que recabamos</h3>
+  <ul>
+    <li><strong>Identificación y contacto:</strong> nombre, apellido y correo electrónico. Si usas el formulario de contacto, también teléfono, empresa, cargo y sector.</li>
+    <li><strong>Cuenta:</strong> contraseña (se guarda cifrada y nadie en FluxGuard puede leerla), fecha de registro y fecha en que aceptaste este aviso.</li>
+    <li><strong>Compras:</strong> productos, cantidades, montos, folios, fechas y estado de cada pedido. Si compras sin cuenta, el nombre y correo que te solicite PayPal.</li>
+  </ul>
+  <p><strong>No guardamos datos de tarjetas.</strong> Los pagos se capturan directamente en las páginas de PayPal o Stripe. Tampoco recabamos datos personales sensibles.</p>
+
+  <h3>3. ¿Para qué usamos tus datos?</h3>
+  <p><strong>Finalidades primarias</strong> (necesarias para darte el servicio):</p>
+  <ul>
+    <li>Crear y administrar tu cuenta y verificar tu correo electrónico.</li>
+    <li>Procesar tus compras, pagos, envíos, garantías, cambios y devoluciones.</li>
+    <li>Activar y prestar el plan de monitoreo que contrates.</li>
+    <li>Atender tus solicitudes de información y soporte técnico.</li>
+  </ul>
+  <p><strong>Finalidades secundarias</strong> (no son necesarias para el servicio): enviarte información de nuevos productos, promociones y encuestas de satisfacción. Si no quieres que usemos tus datos para esto, escríbenos a <a href="mailto:${FLUXGUARD_CORREO}">${FLUXGUARD_CORREO}</a>. Negarte no afecta los servicios que contrates.</p>
+
+  <h3>4. ¿Con quién compartimos tus datos?</h3>
+  <p>Solo con proveedores que nos ayudan a operar el sitio y que tratan los datos por cuenta nuestra: alojamiento del sitio y base de datos, envío de correos electrónicos, procesadores de pago (PayPal y Stripe) y la paquetería que entrega tu pedido. <strong>No vendemos ni rentamos tus datos personales.</strong> Solo los entregaremos a una autoridad cuando una ley o una orden judicial lo exijan.</p>
+
+  <h3>5. Derechos ARCO</h3>
+  <p>Tienes derecho a <strong>Acceder</strong> a tus datos, <strong>Rectificarlos</strong> si son inexactos, <strong>Cancelarlos</strong> cuando consideres que no se requieren y <strong>Oponerte</strong> a su uso para fines específicos. Envía tu solicitud a <a href="mailto:${FLUXGUARD_CORREO}">${FLUXGUARD_CORREO}</a> con tu nombre, el correo de tu cuenta, el derecho que quieres ejercer, una descripción clara de lo que solicitas y una identificación oficial que acredite tu identidad. Te responderemos en los plazos que establece la ley.</p>
+
+  <h3>6. Revocación del consentimiento y limitación del uso</h3>
+  <p>Puedes revocar en cualquier momento el consentimiento que nos diste o pedirnos que limitemos el uso de tus datos, por el mismo medio del punto anterior. Si la revocación impide prestarte un servicio (por ejemplo, mantener tu cuenta activa), te lo informaremos.</p>
+
+  <h3>7. Almacenamiento en tu navegador</h3>
+  <p>El sitio guarda en el almacenamiento local de tu navegador tu sesión iniciada y el carrito de compras de invitado. No usamos cookies de publicidad ni de rastreo. Puedes borrar estos datos desde la configuración de tu navegador; al hacerlo se cerrará tu sesión.</p>
+
+  <h3>8. Cambios a este aviso</h3>
+  <p>Publicaremos cualquier cambio en este sitio. Si cambian las finalidades para las que usamos tus datos, te pediremos de nuevo tu consentimiento.</p>
+
+  <h3>9. Autoridad</h3>
+  <p>Si consideras que tu derecho a la protección de datos personales fue vulnerado, puedes acudir ante la autoridad competente en materia de protección de datos personales.</p>`;
+
+function abrirAvisoPrivacidad() {
+  const casilla = document.getElementById("reg-privacidad");
+  // En el registro, la ventana ofrece marcar la casilla al terminar de leer
+  const pie = casilla
+    ? `<button type="button" class="plan-button flux-modal-secundario" data-bs-dismiss="modal">CERRAR</button>
+       <button type="button" class="plan-button cart-checkout" id="btn-aceptar-privacidad">LEÍ Y ACEPTO EL AVISO <i class="bi bi-check2"></i></button>`
+    : null;
+  const { pie: pieEl } = abrirSobrepantalla({
+    kicker: "FLUXGUARD / DATOS PERSONALES",
+    titulo: "Aviso de Privacidad Integral",
+    cuerpo: `<div class="flux-legal">${AVISO_PRIVACIDAD_HTML}</div>`,
+    pie
+  });
+  pieEl.querySelector("#btn-aceptar-privacidad")?.addEventListener("click", () => {
+    casilla.checked = true;
+    casilla.dispatchEvent(new Event("change"));
+    cerrarSobrepantalla();
+  });
+}
+
+// --- Políticas de Compra, Envío y Devoluciones ---
+const POLITICAS = {
+  compra: {
+    icono: "bi-bag-check",
+    nombre: "COMPRA",
+    html: `
+      <h3>Precios y pagos</h3>
+      <ul>
+        <li>Todos los precios están en pesos mexicanos (MXN) e incluyen IVA. Se cobra el total que ves en tu carrito al momento de pagar.</li>
+        <li>Puedes pagar con tarjeta de crédito o débito (procesada por Stripe) o con PayPal. FluxGuard no recibe ni guarda los datos de tu tarjeta.</li>
+        <li>Tu pedido queda confirmado cuando el procesador de pago confirma el cobro. En ese momento recibes un folio (por ejemplo FLX-P12345678) que puedes consultar en <strong>Mis compras</strong>.</li>
+        <li>Si necesitas factura, escríbenos a <a href="mailto:${FLUXGUARD_CORREO}">${FLUXGUARD_CORREO}</a> con tu folio y tus datos fiscales.</li>
+      </ul>
+      <h3>Reglas del carrito</h3>
+      <ul>
+        <li>Puedes comprar hardware y servicios como invitado. Los planes de monitoreo requieren una cuenta, porque se activan en ella.</li>
+        <li>Las personalizaciones y la garantía extendida son para el Kit Piloto: puedes agregar una de cada una por kit que tengas en el carrito o que ya hayas comprado.</li>
+        <li>Solo puedes tener un plan a la vez. El pago de un plan lo activa por un mes; para continuar, lo renuevas desde Planes.</li>
+        <li>La disponibilidad depende del stock que se muestra en la tienda. Si un producto se agota antes de que pagues, ajustamos tu carrito y te avisamos antes del cobro.</li>
+      </ul>`
+  },
+  envio: {
+    icono: "bi-truck",
+    nombre: "ENVÍO",
+    html: `
+      <h3>Qué se envía</h3>
+      <p>Solo el hardware: Kit Piloto, carcasa, pantalla y batería. Los planes de monitoreo y la garantía extendida se activan en línea y no requieren envío.</p>
+      <h3>Cobertura y costo</h3>
+      <ul>
+        <li>Enviamos a toda la República Mexicana por paquetería.</li>
+        <li>El costo del envío está incluido en el precio de los productos: no hay cargos adicionales al total de tu carrito.</li>
+      </ul>
+      <h3>Tiempos</h3>
+      <ul>
+        <li>Preparamos tu pedido en 1 a 3 días hábiles después de confirmado el pago. La carcasa personalizada puede requerir hasta 5 días hábiles más por su impresión en 3D.</li>
+        <li>La paquetería entrega normalmente en 3 a 7 días hábiles, según tu ubicación.</li>
+        <li>Te escribiremos al correo de tu pedido para confirmar tu dirección de entrega y compartirte el número de guía.</li>
+      </ul>
+      <h3>Al recibir tu paquete</h3>
+      <p>Revisa que el empaque llegue en buen estado. Si llega dañado o le falta algo, avísanos dentro de las 48 horas siguientes a la entrega, con fotos y tu folio.</p>`
+  },
+  devoluciones: {
+    icono: "bi-arrow-counterclockwise",
+    nombre: "DEVOLUCIONES",
+    html: `
+      <h3>Cancelación de tu compra</h3>
+      <p>Tienes <strong>5 días hábiles</strong> a partir de la entrega para cancelar tu compra sin ninguna responsabilidad, como lo prevé la Ley Federal de Protección al Consumidor para las ventas a distancia. El producto debe estar completo, sin uso y en su empaque original.</p>
+      <h3>Garantía</h3>
+      <ul>
+        <li>Cada producto incluye la garantía que se indica en la tienda contra defectos de fabricación (1 año el Kit Piloto y la pantalla; 6 meses la carcasa y la batería). La garantía extendida añade un año al Kit Piloto.</li>
+        <li>La garantía no cubre daños por instalación incorrecta, voltajes fuera de especificación, golpes, humedad o modificaciones al equipo.</li>
+      </ul>
+      <h3>Cómo solicitar una devolución o garantía</h3>
+      <ol>
+        <li>Escríbenos a <a href="mailto:${FLUXGUARD_CORREO}">${FLUXGUARD_CORREO}</a> con tu folio, el producto y el motivo. Si es una falla, agrega fotos o un video.</li>
+        <li>Te enviaremos las instrucciones y la guía para regresar el producto.</li>
+        <li>Al recibirlo y revisarlo, te reembolsamos por el mismo medio de pago o te reponemos el equipo, según corresponda.</li>
+      </ol>
+      <h3>Planes y servicios</h3>
+      <p>Puedes dejar de renovar tu plan en cualquier momento y conservas el acceso hasta el final del periodo pagado. Si se te hizo un cobro indebido, escríbenos y lo revisamos.</p>`
+  }
+};
+
+function abrirPoliticas(seccionInicial = "compra") {
+  const pestanas = Object.keys(POLITICAS).map(clave => `
+    <button type="button" class="shop-filter" data-politica="${clave}" aria-pressed="false">
+      <i class="bi ${POLITICAS[clave].icono}"></i> ${POLITICAS[clave].nombre}
+    </button>`).join("");
+  const { cuerpo } = abrirSobrepantalla({
+    kicker: "FLUXGUARD / ANTES DE COMPRAR",
+    titulo: "Políticas de compra, envío y devoluciones",
+    cuerpo: `
+      <div class="shop-filters flux-modal-tabs" role="group" aria-label="Políticas">${pestanas}</div>
+      <div class="flux-legal" id="fluxPoliticaContenido" aria-live="polite"></div>
+      <p class="flux-legal-fecha mt-4 mb-0">Última actualización: octubre de 2026 · Dudas: <a href="mailto:${FLUXGUARD_CORREO}">${FLUXGUARD_CORREO}</a></p>`
+  });
+  const mostrar = clave => {
+    cuerpo.querySelectorAll("[data-politica]").forEach(b => {
+      const activo = b.dataset.politica === clave;
+      b.classList.toggle("is-active", activo);
+      b.setAttribute("aria-pressed", String(activo));
+    });
+    cuerpo.querySelector("#fluxPoliticaContenido").innerHTML = POLITICAS[clave].html;
+  };
+  cuerpo.querySelectorAll("[data-politica]").forEach(b => b.addEventListener("click", () => mostrar(b.dataset.politica)));
+  mostrar(POLITICAS[seccionInicial] ? seccionInicial : "compra");
+}
+
+// --- Historial de compras ---
+const METODOS_PAGO = {
+  paypal_sandbox: "PayPal (modo de prueba)", paypal: "PayPal",
+  stripe_test: "Tarjeta (modo de prueba)", stripe: "Tarjeta", sin_costo: "Sin costo"
+};
+
+function nombreMetodoPago(metodo) {
+  return METODOS_PAGO[metodo] || "Sin costo";
+}
+
+function estadoPedido(pedido) {
+  if (pedido.estado === "PAGADO") return { clase: "is-ok", texto: "PAGADO" };
+  if (pedido.estado === "PENDIENTE") return { clase: "is-low", texto: pedido.pagoId ? "EN REVISIÓN" : "PENDIENTE DE PAGO" };
+  if (pedido.estado === "REEMBOLSADO") return { clase: "is-info", texto: "REEMBOLSADO" };
+  if (pedido.estado === "RECHAZADO") return { clase: "is-out", texto: "RECHAZADO" };
+  return { clase: "is-off", texto: "CANCELADO" };
+}
+
+async function abrirHistorialCompras() {
+  const { cuerpo } = abrirSobrepantalla({
+    kicker: "FLUXGUARD / MI CUENTA",
+    titulo: "Historial de compras",
+    cuerpo: `<div class="text-center py-4"><span class="spinner-border spinner-border-sm me-2"></span> Cargando tus pedidos...</div>`
+  });
+
+  if (!localStorage.getItem("fluxg_token")) {
+    const regreso = window.location.pathname.split("/").pop() || "index.html";
+    cuerpo.innerHTML = `
+      <div class="cart-empty py-4">
+        <i class="bi bi-person-lock"></i>
+        <p>Inicia sesión para ver tu historial de compras.</p>
+        <a href="login.html?redirect=${encodeURIComponent(regreso)}" class="plan-button d-inline-flex">INICIAR SESIÓN <i class="bi bi-arrow-up-right ms-2"></i></a>
+      </div>`;
+    return;
+  }
+
+  let pedidos;
+  try {
+    const response = await apiFetch("/api/pedidos");
+    const data = await response.json().catch(() => null);
+    if (!response.ok || !data?.success) throw new Error(data?.message || "No se pudo cargar tu historial de compras.");
+    pedidos = data.pedidos || [];
+  } catch (error) {
+    cuerpo.innerHTML = `<div id="fluxHistorialAlert"></div>`;
+    showAlert(cuerpo.querySelector("#fluxHistorialAlert"), "danger", escapeHtml(error.message));
+    return;
+  }
+
+  if (pedidos.length === 0) {
+    cuerpo.innerHTML = `
+      <div class="cart-empty py-4">
+        <i class="bi bi-receipt"></i>
+        <p>Aún no tienes compras registradas.</p>
+        <a href="tienda.html" class="plan-button d-inline-flex">IR A LA TIENDA <i class="bi bi-arrow-up-right ms-2"></i></a>
+      </div>`;
+    return;
+  }
+
+  const pagados = pedidos.filter(p => p.estado === "PAGADO");
+  const totalPagado = pagados.reduce((suma, p) => suma + p.total, 0);
+  const fecha = valor => valor ? new Date(valor).toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+  cuerpo.innerHTML = `
+    <div class="flux-historial-resumen">
+      <div><span>PEDIDOS</span><strong>${pedidos.length}</strong></div>
+      <div><span>PAGADOS</span><strong>${pagados.length}</strong></div>
+      <div><span>TOTAL PAGADO</span><strong>${dinero(totalPagado)}</strong></div>
+    </div>
+    <div class="flux-historial-tabla">
+      <table>
+        <thead>
+          <tr><th>Folio</th><th>Fecha</th><th>Productos</th><th>Método</th><th>Estado</th><th class="text-end">Total</th></tr>
+        </thead>
+        <tbody>
+          ${pedidos.map(p => {
+            const estado = estadoPedido(p);
+            const productos = (p.lineas || []).map(l => `${l.cantidad} × ${escapeHtml(l.nombre)}`).join("<br>");
+            return `
+              <tr>
+                <td class="font-monospace">${escapeHtml(p.folio)}</td>
+                <td>${escapeHtml(fecha(p.fecha))}</td>
+                <td>${productos || "—"}</td>
+                <td>${escapeHtml(nombreMetodoPago(p.metodoPago))}</td>
+                <td><span class="shop-stock ${estado.clase}">${estado.texto}</span></td>
+                <td class="text-end flux-historial-total">${dinero(p.total)}</td>
+              </tr>`;
+          }).join("")}
+        </tbody>
+      </table>
+    </div>
+    <p class="flux-legal-fecha mt-3 mb-0">¿Dudas con un pedido? Escríbenos a <a href="mailto:${FLUXGUARD_CORREO}">${FLUXGUARD_CORREO}</a> con tu folio. Consulta las <a href="#" data-sobrepantalla="politicas" data-seccion="devoluciones">políticas de devolución</a>.</p>`;
 }

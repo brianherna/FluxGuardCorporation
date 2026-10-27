@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fluxguard.dto.ApiResponse;
 import com.fluxguard.dto.UsuarioDto;
 import com.fluxguard.model.Pedido;
+import com.fluxguard.model.Usuario;
 import com.fluxguard.repository.PedidoRepository;
 import com.fluxguard.repository.UsuarioRepository;
 import com.fluxguard.service.CarritoService.CarritoException;
@@ -22,6 +23,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -94,6 +96,19 @@ public class PagoController {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                     .body(ApiResponse.error("No pudimos conectar con " + proveedor + ". Intenta de nuevo en unos momentos."));
         }
+    }
+
+    /** Historial de compras del usuario con sesión, del más reciente al más antiguo. */
+    @GetMapping("/pedidos")
+    public ResponseEntity<ApiResponse<Void>> pedidos(@RequestHeader(value = "Authorization", required = false) String authorization) {
+        Optional<String> usuarioId = sesionService.usuarioDesde(authorization).map(Usuario::getId);
+        if (usuarioId.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error("Inicia sesión para ver tu historial de compras."));
+        }
+        List<Pedido> pedidos = pedidoRepository.findByUsuarioIdOrderByFechaDesc(usuarioId.get());
+        ApiResponse<Void> response = ApiResponse.ok("Historial de compras");
+        response.setPedidos(pedidos);
+        return ResponseEntity.ok(response);
     }
 
     /** Estado de un pedido del usuario. */
