@@ -262,17 +262,29 @@
           <i class="bi bi-check2-circle"></i>
           <h2>¡Pago confirmado!</h2>
           <p class="text-white-50 mb-2">Folio <strong class="text-white">${escapeHtml(pedido.folio)}</strong> · Total ${dinero(pedido.total)} · ${escapeHtml(metodo)}</p>
-          ${pedido.correoCliente ? `<p class="text-white-50 mb-4">Te contactaremos en <strong class="text-white">${escapeHtml(pedido.correoCliente)}</strong> para el envío de tu pedido. Guarda tu folio.</p>` : `<div class="mb-4"></div>`}
+          ${pedido.correoCliente ? `<p class="text-white-50 mb-4">Te enviamos tu ticket a <strong class="text-white">${escapeHtml(pedido.correoCliente)}</strong> y ahí te contactaremos para el envío de tu pedido. Guarda tu folio.</p>` : `<div class="mb-4"></div>`}
           <div class="cart-lines text-start mb-4">${pedido.lineas.map(l => `
             <div class="cart-line" style="grid-template-columns:1fr auto">
               <div class="cart-line-info"><strong>${escapeHtml(l.nombre)}</strong><span>${l.cantidad} × ${dinero(l.precioUnitario)}</span></div>
               <b class="cart-line-total">${dinero(l.importe)}</b>
             </div>`).join("")}
           </div>
+          <p class="ticket-descarga-estado" id="ticket-descarga-estado" aria-live="polite"><span class="spinner-border spinner-border-sm me-2"></span> Descargando tu ticket en PDF...</p>
+          <button type="button" class="plan-button cart-checkout" id="btn-descargar-ticket">DESCARGAR PDF <i class="bi bi-file-earmark-pdf ms-2"></i></button>
+          <button type="button" class="plan-button" id="btn-imprimir-ticket">IMPRIMIR TICKET <i class="bi bi-printer ms-2"></i></button>
           ${usuario?.suscripcion ? `<a href="dashboard.html" class="plan-button cart-checkout">IR A MI DASHBOARD <i class="bi bi-arrow-up-right ms-2"></i></a>` : ""}
           <a href="tienda.html" class="plan-button">SEGUIR COMPRANDO <i class="bi bi-arrow-up-right ms-2"></i></a>
           <div id="resenas-post-compra" class="text-start"></div>
         </div>`;
+      document.getElementById("btn-imprimir-ticket").addEventListener("click", () => imprimirTicket(pedido));
+
+      // El PDF del ticket se descarga solo al confirmar la compra; el botón sirve para volver a bajarlo
+      const estadoDescarga = document.getElementById("ticket-descarga-estado");
+      const bajarPdf = () => descargarTicketPdf(pedido.folio)
+        .then(() => estadoDescarga.innerHTML = `<i class="bi bi-check2-circle me-1"></i> Tu ticket se descargó en PDF.`)
+        .catch(() => estadoDescarga.innerHTML = `<i class="bi bi-exclamation-circle me-1"></i> No se pudo descargar automáticamente. Usa el botón "Descargar PDF".`);
+      document.getElementById("btn-descargar-ticket").addEventListener("click", bajarPdf);
+      bajarPdf();
       // Con sesión: calificar lo que compró. Sin sesión: carrusel de reseñas positivas.
       initResenasPostCompra(document.getElementById("resenas-post-compra"), pedido);
     }

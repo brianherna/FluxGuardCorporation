@@ -63,7 +63,10 @@ public class BrevoEmailService {
                 PlantillaVerificacion.texto(nombre, enlace, horasVigencia), null));
     }
 
-    /** Envía un correo cualquiera. Sin configuración solo lo registra en la consola. Lanza RestClientException si Brevo lo rechaza. */
+    /**
+     * Envía un correo cualquiera, con Reply-To y adjunto opcionales. Sin configuración solo lo registra en la consola.
+     * Lanza RestClientException si Brevo lo rechaza.
+     */
     public void enviar(Correo correo) {
         if (!estaConfigurado()) {
             log.warn("[FluxG] (modo desarrollo) Correo para {}: \"{}\"", correo.para(), correo.asunto());
@@ -83,6 +86,9 @@ public class BrevoEmailService {
         body.put("textContent", correo.texto());
         if (correo.responderA() != null) {
             body.put("replyTo", Map.of("email", correo.responderA()));
+        }
+        if (correo.adjunto() != null) {
+            body.put("attachment", List.of(Map.of("name", correo.adjunto().nombre(), "content", correo.adjunto().base64())));
         }
 
         try {

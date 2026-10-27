@@ -48,16 +48,18 @@ public class PagoService {
     private final PedidoRepository pedidoRepository;
     private final UsuarioRepository usuarioRepository;
     private final SuscripcionService suscripcionService;
+    private final CorreoService correoService;
 
     public PagoService(CarritoService carritoService, PayPalService payPal, StripeService stripe,
                        PedidoRepository pedidoRepository, UsuarioRepository usuarioRepository,
-                       SuscripcionService suscripcionService) {
+                       SuscripcionService suscripcionService, CorreoService correoService) {
         this.carritoService = carritoService;
         this.payPal = payPal;
         this.stripe = stripe;
         this.pedidoRepository = pedidoRepository;
         this.usuarioRepository = usuarioRepository;
         this.suscripcionService = suscripcionService;
+        this.correoService = correoService;
     }
 
     /** Métodos de pago configurados en el servidor, para que carrito.html solo muestre los que funcionan. */
@@ -197,7 +199,7 @@ public class PagoService {
         return pedido;
     }
 
-    /** Marca el pedido como pagado, activa el plan que incluya y vacía el carrito del usuario. */
+    /** Marca el pedido como pagado, activa el plan que incluya, vacía el carrito y envía el ticket por correo. */
     private void completar(Pedido pedido) {
         pedido.setEstado(Pedido.PAGADO);
         pedido.setPagadoEn(LocalDateTime.now());
@@ -225,6 +227,20 @@ public class PagoService {
         });
 
         carritoService.vaciar(pedido.getUsuarioId());
+        enviarTicket(pedido);
+    }
+
+    /** El ticket se envía una sola vez, al pasar a PAGADO. Si el correo falla, el pago sigue confirmado. */
+    private void enviarTicket(Pedido pedido) {
+        if (pedido.getCorreoCliente() == null || pedido.getCorreoCliente().isBlank()) {
+            log.warn("[FluxG] Pedido {} pagado sin correo del cliente: no se envió el ticket.", pedido.getFolio());
+            return;
+        }
+        try {
+            correoService.enviarTicket(pedido);
+        } catch (RuntimeException e) {
+            log.error("[FluxG] No se pudo enviar el ticket del pedido {} a {}: {}", pedido.getFolio(), pedido.getCorreoCliente(), e.getMessage());
+        }
     }
 
     private boolean montoCoincide(Pedido pedido, Captura captura) {

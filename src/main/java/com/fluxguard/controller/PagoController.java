@@ -16,9 +16,13 @@ import com.fluxguard.service.PayPalService.PayPalException;
 import com.fluxguard.service.SesionService;
 import com.fluxguard.service.StripeService;
 import com.fluxguard.service.StripeService.StripeException;
+import com.fluxguard.service.TicketPdf;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -117,6 +121,30 @@ public class PagoController {
                                                          @RequestHeader(value = CarritoController.INVITADO, required = false) String invitado,
                                                          @PathVariable String folio) {
         return conPedido(authorization, invitado, folio, pedido -> pedido);
+    }
+
+    /** Ticket del pedido en PDF. Solo para su dueño (con sesión o el invitado que compró) y cuando ya está pagado. */
+    @GetMapping("/pedidos/{folio}/ticket")
+    public ResponseEntity<?> ticket(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                    @RequestHeader(value = CarritoController.INVITADO, required = false) String invitado,
+                                    @PathVariable String folio) {
+        Optional<Comprador> comprador = sesionService.compradorDesde(authorization, invitado);
+        if (comprador.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error("Tu sesión expiró. Recarga la página."));
+        }
+        Optional<Pedido> pedido = pedidoRepository.findByFolio(folio)
+                .filter(p -> p.getUsuarioId().equals(comprador.get().clave()));
+        if (pedido.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ApiResponse.error("No encontramos ese pedido."));
+        }
+        if (!pedido.get().estaPagado()) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(ApiResponse.error("El ticket está disponible cuando se confirma el pago."));
+        }
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename(TicketPdf.nombreArchivo(pedido.get())).build().toString())
+                .body(TicketPdf.generar(pedido.get()));
     }
 
     /** Al regresar de PayPal o Stripe, carrito.html manda el "token" (orden o sesión) y aquí se confirma el pago. */

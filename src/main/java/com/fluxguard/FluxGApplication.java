@@ -6,11 +6,14 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 import java.io.File;
 import java.nio.file.Files;
 import java.util.List;
+import java.util.TimeZone;
 
 @SpringBootApplication
 public class FluxGApplication {
 
     public static void main(String[] args) {
+        // Fechas en hora del centro de México aunque el servidor (p. ej. Render) esté en UTC: tickets, pedidos y reseñas
+        TimeZone.setDefault(TimeZone.getTimeZone("America/Mexico_City"));
         loadEnv();
         SpringApplication.run(FluxGApplication.class, args);
     }

@@ -147,6 +147,34 @@ class ControladoresTests {
     }
 
     @Test
+    void ticketPdfSoloParaElDuenoYConElPedidoPagado() {
+        Usuario usuario = usuarioVerificado();
+        when(usuarioRepository.findById("u1")).thenReturn(Optional.of(usuario));
+        String token = sesionService.crear(usuario);
+        when(sesionRepository.findByTokenHash(Tokens.sha256(token))).thenReturn(Optional.of(
+                new Sesion(Tokens.sha256(token), "u1", LocalDateTime.now(), LocalDateTime.now().plusDays(1))));
+
+        PedidoRepository pedidoRepository = mock(PedidoRepository.class);
+        List<Pedido.Linea> lineas = List.of(new Pedido.Linea("kit-piloto", "Kit Piloto FluxGuard", 350, 1, 350));
+        when(pedidoRepository.findByFolio("FLX-PAGADO")).thenReturn(Optional.of(new Pedido("FLX-PAGADO", "u1", lineas, 350, Pedido.PAGADO, LocalDateTime.now())));
+        when(pedidoRepository.findByFolio("FLX-PENDIENTE")).thenReturn(Optional.of(new Pedido("FLX-PENDIENTE", "u1", lineas, 350, Pedido.PENDIENTE, LocalDateTime.now())));
+        when(pedidoRepository.findByFolio("FLX-AJENO")).thenReturn(Optional.of(new Pedido("FLX-AJENO", "otro", lineas, 350, Pedido.PAGADO, LocalDateTime.now())));
+        PagoController controller = new PagoController(mock(PagoService.class), mock(StripeService.class),
+                pedidoRepository, usuarioRepository, sesionService);
+        String auth = "Bearer " + token;
+
+        assertEquals(HttpStatus.UNAUTHORIZED, controller.ticket(null, null, "FLX-PAGADO").getStatusCode());
+        assertEquals(HttpStatus.NOT_FOUND, controller.ticket(auth, null, "FLX-AJENO").getStatusCode());
+        assertEquals(HttpStatus.CONFLICT, controller.ticket(auth, null, "FLX-PENDIENTE").getStatusCode());
+
+        var respuesta = controller.ticket(auth, null, "FLX-PAGADO");
+        assertEquals(HttpStatus.OK, respuesta.getStatusCode());
+        assertEquals("application/pdf", respuesta.getHeaders().getContentType().toString());
+        assertTrue(respuesta.getHeaders().getContentDisposition().getFilename().equals("ticket-FLX-PAGADO.pdf"));
+        assertEquals("%PDF-", new String((byte[]) respuesta.getBody(), 0, 5));
+    }
+
+    @Test
     void listaDeProspectosRequiereClaveDeAdministrador() {
         ProspectoRepository repo = mock(ProspectoRepository.class);
         when(repo.findAllByOrderByFechaRegistroDesc()).thenReturn(List.of());

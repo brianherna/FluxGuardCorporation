@@ -1264,13 +1264,34 @@ async function abrirHistorialCompras() {
                 <td>${escapeHtml(nombreMetodoPago(p.metodoPago))}</td>
                 <td><span class="shop-stock ${estado.clase}">${estado.texto}</span></td>
                 <td class="text-end flux-historial-total">${dinero(p.total)}</td>
-                <td>${p.estado === "PAGADO" ? `<button type="button" class="flux-opinar-btn" data-opinar="${escapeHtml(p.folio)}"><i class="bi bi-star"></i> OPINAR</button>` : ""}</td>
+                <td>${p.estado === "PAGADO" ? `
+                  <div class="flux-historial-acciones">
+                    <button type="button" class="flux-opinar-btn flux-ticket-btn" data-ticket-pdf="${escapeHtml(p.folio)}"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
+                    <button type="button" class="flux-opinar-btn flux-ticket-btn" data-ticket="${escapeHtml(p.folio)}"><i class="bi bi-printer"></i> IMPRIMIR</button>
+                    <button type="button" class="flux-opinar-btn" data-opinar="${escapeHtml(p.folio)}"><i class="bi bi-star"></i> OPINAR</button>
+                  </div>` : ""}</td>
               </tr>`;
           }).join("")}
         </tbody>
       </table>
     </div>
     <p class="flux-legal-fecha mt-3 mb-0">¿Dudas con un pedido? Escríbenos a <a href="mailto:${FLUXGUARD_CORREO}">${FLUXGUARD_CORREO}</a> con tu folio. Consulta las <a href="#" data-sobrepantalla="politicas" data-seccion="devoluciones">políticas de devolución</a>.</p>`;
+
+  cuerpo.querySelectorAll("[data-ticket]").forEach(boton => boton.addEventListener("click", () =>
+    imprimirTicket(pedidos.find(p => p.folio === boton.dataset.ticket))));
+  cuerpo.querySelectorAll("[data-ticket-pdf]").forEach(boton => boton.addEventListener("click", async () => {
+    const original = boton.innerHTML;
+    boton.disabled = true;
+    boton.innerHTML = `<span class="spinner-border spinner-border-sm"></span>`;
+    try {
+      await descargarTicketPdf(boton.dataset.ticketPdf);
+    } catch (error) {
+      alert(error.message);
+    } finally {
+      boton.disabled = false;
+      boton.innerHTML = original;
+    }
+  }));
 
   // "Opinar" cambia el contenido de la ventana por el formulario de reseñas de ese pedido
   cuerpo.querySelectorAll("[data-opinar]").forEach(boton => boton.addEventListener("click", () => {
@@ -1486,4 +1507,81 @@ async function mostrarCarruselResenas(contenedor) {
   seccion.addEventListener("mouseleave", reiniciar);
   ir(0);
   reiniciar();
+}
+
+
+// ===== Ticket de compra imprimible =====
+// El mismo ticket que se envía por correo (PlantillaTicket.java), en blanco y negro para imprimir.
+
+const dineroConCentavos = n => Number(n || 0).toLocaleString("es-MX", { style: "currency", currency: "MXN" });
+
+function ticketHtml(pedido) {
+  const total = Number(pedido.total || 0);
+  // Los precios ya incluyen IVA: solo se desglosa
+  const subtotal = Math.round((total / 1.16) * 100) / 100;
+  const iva = Math.round((total - subtotal) * 100) / 100;
+  const fechaPago = pedido.pagadoEn || pedido.fecha;
+  const fecha = fechaPago ? new Date(fechaPago).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" }) : "";
+  const fila = (etiqueta, valor) => valor ? `<div class="ticket-fila"><span>${etiqueta}</span><span>${escapeHtml(valor)}</span></div>` : "";
+  return `
+    <div class="ticket">
+      <div class="ticket-marca">FLUXGUARD</div>
+      <div class="ticket-centro">${escapeHtml(FLUXGUARD_DOMICILIO)}<br>${escapeHtml(FLUXGUARD_CORREO)}</div>
+      <div class="ticket-titulo">TICKET DE COMPRA</div>
+      ${fila("Folio", pedido.folio)}
+      ${fila("Fecha", fecha)}
+      ${fila("Cliente", pedido.nombreCliente)}
+      ${fila("Correo", pedido.correoCliente)}
+      ${fila("Pago", nombreMetodoPago(pedido.metodoPago))}
+      ${fila("Referencia", pedido.pagoId)}
+      <div class="ticket-linea"></div>
+      ${(pedido.lineas || []).map(l => `
+        <div class="ticket-producto">
+          <div>${escapeHtml(l.nombre)}</div>
+          <div class="ticket-fila"><span>${l.cantidad} × ${dineroConCentavos(l.precioUnitario)}</span><span>${dineroConCentavos(l.importe)}</span></div>
+        </div>`).join("")}
+      <div class="ticket-linea"></div>
+      <div class="ticket-fila"><span>Subtotal</span><span>${dineroConCentavos(subtotal)}</span></div>
+      <div class="ticket-fila"><span>IVA (16 %)</span><span>${dineroConCentavos(iva)}</span></div>
+      <div class="ticket-fila ticket-total"><span>TOTAL</span><span>${dineroConCentavos(total)}</span></div>
+      <div class="ticket-linea"></div>
+      <div class="ticket-centro">¡Gracias por tu compra!<br>Conserva tu folio para garantías y devoluciones.</div>
+      <div class="ticket-centro ticket-nota">Este ticket no es un comprobante fiscal (CFDI). Si necesitas factura, escríbenos con tu folio.</div>
+    </div>`;
+}
+
+// Imprime solo el ticket: el resto de la página se oculta con @media print (styles.css)
+function imprimirTicket(pedido) {
+  let contenedor = document.getElementById("ticket-impresion");
+  if (!contenedor) {
+    contenedor = document.createElement("div");
+    contenedor.id = "ticket-impresion";
+    document.body.appendChild(contenedor);
+  }
+  contenedor.innerHTML = ticketHtml(pedido);
+  document.body.classList.add("imprimiendo-ticket");
+  const terminar = () => {
+    document.body.classList.remove("imprimiendo-ticket");
+    window.removeEventListener("afterprint", terminar);
+  };
+  window.addEventListener("afterprint", terminar);
+  window.print();
+}
+
+
+// Descarga el PDF del ticket (lo genera el servidor; solo para el dueño del pedido pagado)
+async function descargarTicketPdf(folio) {
+  const response = await apiFetch(`/api/pedidos/${encodeURIComponent(folio)}/ticket`);
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.message || "No se pudo descargar el ticket.");
+  }
+  const url = URL.createObjectURL(await response.blob());
+  const enlace = document.createElement("a");
+  enlace.href = url;
+  enlace.download = `ticket-${folio}.pdf`;
+  document.body.appendChild(enlace);
+  enlace.click();
+  enlace.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
 }

@@ -1890,3 +1890,28 @@ select {
 .shop-reviews .review-carousel-window{max-width:900px}
 .shop-reviews .review-carousel-controls{max-width:900px}
 .shop-reviews[hidden]{display:none !important}
+
+/* ===== Ticket de compra imprimible ===== */
+#ticket-impresion{display:none}
+.ticket{width:80mm;max-width:100%;margin:0 auto;color:#000;background:#fff;font-family:"Courier New",Courier,monospace;font-size:12px;line-height:1.45}
+.ticket-marca{text-align:center;font-family:Arial,Helvetica,sans-serif;font-size:22px;font-weight:900;letter-spacing:.18em}
+.ticket-titulo{margin:10px 0 8px;padding:4px 0;border-top:1px dashed #000;border-bottom:1px dashed #000;text-align:center;font-weight:700;letter-spacing:.12em}
+.ticket-centro{text-align:center;font-size:11px}
+.ticket-nota{margin-top:8px;font-size:10px}
+.ticket-fila{display:flex;justify-content:space-between;gap:10px}
+.ticket-fila span:last-child{text-align:right;word-break:break-all}
+.ticket-producto{margin:6px 0}
+.ticket-linea{margin:8px 0;border-top:1px dashed #000}
+.ticket-total{margin-top:4px;font-size:15px;font-weight:700}
+.flux-historial-acciones{display:flex;flex-direction:column;gap:6px}
+.flux-ticket-btn{border-color:rgba(185,167,255,.45);color:var(--gold)}
+.flux-ticket-btn:hover{background:rgba(185,167,255,.12)}
+@media print{
+  @page{margin:10mm}
+  body.imprimiendo-ticket{background:#fff !important;overflow:visible !important}
+  body.imprimiendo-ticket>*:not(#ticket-impresion){display:none !important}
+  body.imprimiendo-ticket #ticket-impresion{display:block !important}
+}
+.ticket-descarga-estado{margin:0 0 14px;color:#a39db0;font-size:12px}
+.ticket-descarga-estado .bi-check2-circle{color:#58e0a0}
+.ticket-descarga-estado .bi-exclamation-circle{color:#ffc56b}

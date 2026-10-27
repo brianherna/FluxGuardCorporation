@@ -65,7 +65,7 @@ public class ResendEmailService {
                 PlantillaVerificacion.texto(nombre, enlace, horasVigencia), null));
     }
 
-    /** Envía un correo cualquiera. Lanza RestClientException si Resend lo rechaza. */
+    /** Envía un correo cualquiera, con Reply-To y adjunto opcionales. Lanza RestClientException si Resend lo rechaza. */
     public void enviar(Correo correo) {
         Map<String, Object> body = new HashMap<>();
         body.put("from", remitente);
@@ -75,6 +75,9 @@ public class ResendEmailService {
         body.put("text", correo.texto());
         if (correo.responderA() != null) {
             body.put("reply_to", correo.responderA());
+        }
+        if (correo.adjunto() != null) {
+            body.put("attachments", List.of(Map.of("filename", correo.adjunto().nombre(), "content", correo.adjunto().base64())));
         }
 
         try {
