@@ -9,7 +9,8 @@ import java.util.List;
 
 /**
  * Compra hecha desde el carrito. Guarda nombre y precio de cada línea tal como estaban al comprar.
- * Nace como PENDIENTE y pasa a PAGADO solo cuando PayPal confirma el cobro.
+ * Nace como PENDIENTE y pasa a PAGADO solo cuando el proveedor (PayPal o Stripe) confirma el cobro.
+ * Con pago en tienda (Paynet) queda PENDIENTE con su referencia hasta que el cliente pague.
  */
 @Document(collection = "pedidos")
 public class Pedido {
@@ -44,6 +45,11 @@ public class Pedido {
     private String pagoId;
     private String metodoPago;
     private LocalDateTime pagadoEn;
+
+    // Pago en tienda (Paynet): referencia, imagen del código de barras y fecha límite. urlPago guarda la ficha PDF.
+    private String referenciaPago;
+    private String codigoBarrasUrl;
+    private LocalDateTime vencePago;
 
     public Pedido() {}
 
@@ -172,5 +178,29 @@ public class Pedido {
 
     public void setCorreoCliente(String correoCliente) {
         this.correoCliente = correoCliente;
+    }
+
+    public String getReferenciaPago() {
+        return referenciaPago;
+    }
+
+    public void setReferenciaPago(String referenciaPago) {
+        this.referenciaPago = referenciaPago;
+    }
+
+    public String getCodigoBarrasUrl() {
+        return codigoBarrasUrl;
+    }
+
+    public void setCodigoBarrasUrl(String codigoBarrasUrl) {
+        this.codigoBarrasUrl = codigoBarrasUrl;
+    }
+
+    public LocalDateTime getVencePago() {
+        return vencePago;
+    }
+
+    public void setVencePago(LocalDateTime vencePago) {
+        this.vencePago = vencePago;
     }
 }

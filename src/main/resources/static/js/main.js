@@ -1183,15 +1183,27 @@ function abrirPoliticas(seccionInicial = "compra") {
 // --- Historial de compras ---
 const METODOS_PAGO = {
   paypal_sandbox: "PayPal (modo de prueba)", paypal: "PayPal",
-  stripe_test: "Tarjeta (modo de prueba)", stripe: "Tarjeta", sin_costo: "Sin costo"
+  stripe_test: "Tarjeta (modo de prueba)", stripe: "Tarjeta",
+  paynet_sandbox: "Pago en tienda (modo de prueba)", paynet: "Pago en tienda", sin_costo: "Sin costo"
 };
 
 function nombreMetodoPago(metodo) {
   return METODOS_PAGO[metodo] || "Sin costo";
 }
 
+// Pedido apartado con ficha de pago en tienda (Paynet) que aún no se paga
+function esFichaPendiente(pedido) {
+  return pedido.estado === "PENDIENTE" && !!pedido.referenciaPago;
+}
+
+function fichaVencida(pedido) {
+  return esFichaPendiente(pedido) && !!pedido.vencePago && new Date(pedido.vencePago) < new Date();
+}
+
 function estadoPedido(pedido) {
   if (pedido.estado === "PAGADO") return { clase: "is-ok", texto: "PAGADO" };
+  if (fichaVencida(pedido)) return { clase: "is-off", texto: "FICHA VENCIDA" };
+  if (esFichaPendiente(pedido)) return { clase: "is-low", texto: "ESPERANDO PAGO EN TIENDA" };
   if (pedido.estado === "PENDIENTE") return { clase: "is-low", texto: pedido.pagoId ? "EN REVISIÓN" : "PENDIENTE DE PAGO" };
   if (pedido.estado === "REEMBOLSADO") return { clase: "is-info", texto: "REEMBOLSADO" };
   if (pedido.estado === "RECHAZADO") return { clase: "is-out", texto: "RECHAZADO" };
@@ -1269,6 +1281,9 @@ async function abrirHistorialCompras() {
                     <button type="button" class="flux-opinar-btn flux-ticket-btn" data-ticket-pdf="${escapeHtml(p.folio)}"><i class="bi bi-file-earmark-pdf"></i> PDF</button>
                     <button type="button" class="flux-opinar-btn flux-ticket-btn" data-ticket="${escapeHtml(p.folio)}"><i class="bi bi-printer"></i> IMPRIMIR</button>
                     <button type="button" class="flux-opinar-btn" data-opinar="${escapeHtml(p.folio)}"><i class="bi bi-star"></i> OPINAR</button>
+                  </div>` : esFichaPendiente(p) && !fichaVencida(p) ? `
+                  <div class="flux-historial-acciones">
+                    <a class="flux-opinar-btn flux-ticket-btn" href="carrito.html?ficha=${encodeURIComponent(p.folio)}"><i class="bi bi-upc-scan"></i> VER FICHA</a>
                   </div>` : ""}</td>
               </tr>`;
           }).join("")}

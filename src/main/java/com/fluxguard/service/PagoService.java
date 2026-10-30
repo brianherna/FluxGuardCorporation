@@ -39,23 +39,38 @@ public class PagoService {
         }
     }
 
+    /** Faltan o son inválidos los datos del cliente que pide el proveedor (p. ej. nombre y correo para Paynet). */
+    public static class DatosClienteException extends RuntimeException {
+        public DatosClienteException(String mensaje) {
+            super(mensaje);
+        }
+    }
+
+    /** Datos de contacto que escribe un invitado para generar la ficha de pago en tienda. */
+    public record DatosCliente(String nombre, String apellido, String correo) {}
+
+    private static final java.util.regex.Pattern CORREO = java.util.regex.Pattern.compile("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$");
+
     private final CarritoService carritoService;
     public static final String PAYPAL = "paypal";
     public static final String STRIPE = "stripe";
+    public static final String PAYNET = "paynet";
 
     private final PayPalService payPal;
     private final StripeService stripe;
+    private final OpenpayService openpay;
     private final PedidoRepository pedidoRepository;
     private final UsuarioRepository usuarioRepository;
     private final SuscripcionService suscripcionService;
     private final CorreoService correoService;
 
-    public PagoService(CarritoService carritoService, PayPalService payPal, StripeService stripe,
+    public PagoService(CarritoService carritoService, PayPalService payPal, StripeService stripe, OpenpayService openpay,
                        PedidoRepository pedidoRepository, UsuarioRepository usuarioRepository,
                        SuscripcionService suscripcionService, CorreoService correoService) {
         this.carritoService = carritoService;
         this.payPal = payPal;
         this.stripe = stripe;
+        this.openpay = openpay;
         this.pedidoRepository = pedidoRepository;
         this.usuarioRepository = usuarioRepository;
         this.suscripcionService = suscripcionService;
@@ -67,25 +82,53 @@ public class PagoService {
         List<String> metodos = new ArrayList<>();
         if (payPal.estaConfigurado()) metodos.add(PAYPAL);
         if (stripe.estaConfigurado()) metodos.add(STRIPE);
+        if (openpay.estaConfigurado()) metodos.add(PAYNET);
         return metodos;
     }
 
-    /**
-     * Crea el pedido del carrito y el pago en el proveedor elegido ("paypal" o "stripe").
-     * Un pedido de $0 (solo Plan Free) se completa sin cobro.
-     */
     public Inicio iniciar(Comprador comprador, String metodo) {
-        String elegido = STRIPE.equals(metodo) ? STRIPE : PAYPAL;
-        boolean disponible = STRIPE.equals(elegido) ? stripe.estaConfigurado() : payPal.estaConfigurado();
+        return iniciar(comprador, metodo, null);
+    }
+
+    /**
+     * Crea el pedido del carrito y el pago en el proveedor elegido ("paypal", "stripe" o "paynet").
+     * Un pedido de $0 (solo Plan Free) se completa sin cobro.
+     *
+     * @param datos nombre y correo que escribe un invitado; solo los usa Paynet (con sesión se toman de la cuenta)
+     */
+    public Inicio iniciar(Comprador comprador, String metodo, DatosCliente datos) {
+        String elegido = STRIPE.equals(metodo) ? STRIPE : PAYNET.equals(metodo) ? PAYNET : PAYPAL;
+        boolean disponible = switch (elegido) {
+            case STRIPE -> stripe.estaConfigurado();
+            case PAYNET -> openpay.estaConfigurado();
+            default -> payPal.estaConfigurado();
+        };
         // Se revisa antes de crear el pedido para no dejar pedidos pendientes que nadie puede pagar
         if (!disponible && carritoService.ver(comprador).total() > 0) {
             throw new PagoNoDisponibleException("Ese método de pago no está disponible en este momento. Intenta con otro.");
         }
+        DatosCliente cliente = PAYNET.equals(elegido) ? datosParaFicha(comprador, datos) : null;
 
         Pedido pedido = carritoService.crearPedido(comprador);
         if (pedido.getTotal() == 0) {
             pedido.setMetodoPago("sin_costo");
             completar(pedido);
+            return new Inicio(pedido, null);
+        }
+
+        if (PAYNET.equals(elegido)) {
+            OpenpayService.Ficha ficha = openpay.crearFicha(pedido, cliente.nombre(), cliente.apellido(), cliente.correo());
+            pedido.setOrdenId(ficha.cargoId());
+            pedido.setReferenciaPago(ficha.referencia());
+            pedido.setCodigoBarrasUrl(ficha.codigoBarrasUrl());
+            pedido.setUrlPago(ficha.urlPdf());
+            pedido.setVencePago(ficha.vence());
+            pedido.setMetodoPago(openpay.esSandbox() ? "paynet_sandbox" : "paynet");
+            pedido.setNombreCliente((cliente.nombre() + " " + (cliente.apellido() == null ? "" : cliente.apellido())).trim());
+            pedido.setCorreoCliente(cliente.correo());
+            pedidoRepository.save(pedido);
+            // El pedido queda apartado esperando el pago en tienda: el carrito se vacía como en cualquier ficha de pago
+            carritoService.vaciar(comprador.clave());
             return new Inicio(pedido, null);
         }
 
@@ -150,6 +193,23 @@ public class PagoService {
         }
         log.info("[FluxG] Pedido {}: cobro PayPal {} -> {}", pedido.getFolio(), captura.status(), pedido.getEstado());
         return pedido;
+    }
+
+    /** Paynet exige nombre y correo: con sesión salen de la cuenta; un invitado los escribe en la ventana de pago. */
+    private static DatosCliente datosParaFicha(Comprador comprador, DatosCliente datos) {
+        if (!comprador.esInvitado()) {
+            return new DatosCliente(comprador.usuario().getNombre(), comprador.usuario().getApellido(), comprador.usuario().getCorreo());
+        }
+        String nombre = datos == null || datos.nombre() == null ? "" : datos.nombre().trim();
+        String apellido = datos == null || datos.apellido() == null ? "" : datos.apellido().trim();
+        String correo = datos == null || datos.correo() == null ? "" : datos.correo().trim().toLowerCase();
+        if (nombre.isEmpty() || correo.isEmpty()) {
+            throw new DatosClienteException("Escribe tu nombre y correo para generar la ficha de pago.");
+        }
+        if (nombre.length() > 100 || apellido.length() > 100 || correo.length() > 150 || !CORREO.matcher(correo).matches()) {
+            throw new DatosClienteException("Revisa tu nombre y correo electrónico.");
+        }
+        return new DatosCliente(nombre, apellido, correo);
     }
 
     /** Webhook de Stripe (checkout.session.completed): confirma el pedido aunque el cliente no haya regresado a la página. */
