@@ -1,6 +1,7 @@
 package com.fluxguard.service;
 
 import com.fluxguard.model.Pedido;
+import com.fluxguard.model.Producto;
 import com.fluxguard.model.Resena;
 import com.fluxguard.model.Usuario;
 import com.fluxguard.repository.PedidoRepository;
@@ -15,7 +16,9 @@ import java.util.List;
  * Reglas de las reseñas:
  * - Solo opina quien tiene cuenta y compró (y pagó) el producto: se valida contra el pedido.
  * - Una reseña por usuario y producto.
- * - Lo que se publica sin sesión son solo las positivas (4 o 5 estrellas) que tienen comentario.
+ * - Sin sesión solo se publican las positivas (4 o 5 estrellas) que tienen comentario.
+ * - Con sesión se ven todas, buenas y malas (las más recientes).
+ * - Se muestran por sección: las de los planes en Planes y las de los demás productos en la Tienda.
  */
 @Service
 public class ResenaService {
@@ -31,12 +34,24 @@ public class ResenaService {
         }
     }
 
+    /** Dónde se muestran las reseñas: la Tienda (hardware, accesorios, servicios) o la sección Planes. */
+    public enum Seccion {
+        TIENDA, PLANES;
+
+        /** "planes" → PLANES; cualquier otro valor → TIENDA. */
+        public static Seccion de(String valor) {
+            return "planes".equalsIgnoreCase(valor) ? PLANES : TIENDA;
+        }
+    }
+
     private final ResenaRepository resenaRepository;
     private final PedidoRepository pedidoRepository;
+    private final CatalogoService catalogo;
 
-    public ResenaService(ResenaRepository resenaRepository, PedidoRepository pedidoRepository) {
+    public ResenaService(ResenaRepository resenaRepository, PedidoRepository pedidoRepository, CatalogoService catalogo) {
         this.resenaRepository = resenaRepository;
         this.pedidoRepository = pedidoRepository;
+        this.catalogo = catalogo;
     }
 
     public Resena crear(Usuario usuario, String folio, String productoId, Integer calificacion, String comentario) {
@@ -78,11 +93,30 @@ public class ResenaService {
         return resenaRepository.findByUsuarioId(usuario.getId());
     }
 
-    /** Reseñas positivas con comentario, las más recientes primero (para el carrusel público). */
-    public List<Resena> destacadas() {
-        return resenaRepository.findTop30ByCalificacionGreaterThanEqualOrderByFechaDesc(CALIFICACION_POSITIVA).stream()
+    /** Reseñas positivas con comentario de la sección, las más recientes primero (para el carrusel público). */
+    public List<Resena> destacadas(Seccion seccion) {
+        List<String> planes = idsDePlanes();
+        List<Resena> positivas = seccion == Seccion.PLANES
+                ? resenaRepository.findTop30ByCalificacionGreaterThanEqualAndProductoIdInOrderByFechaDesc(CALIFICACION_POSITIVA, planes)
+                : resenaRepository.findTop30ByCalificacionGreaterThanEqualAndProductoIdNotInOrderByFechaDesc(CALIFICACION_POSITIVA, planes);
+        return positivas.stream()
                 .filter(r -> r.getComentario() != null && !r.getComentario().isBlank())
                 .limit(MAX_DESTACADAS)
+                .toList();
+    }
+
+    /** Todas las reseñas de la sección, buenas y malas, las más recientes primero (solo para usuarios con sesión). */
+    public List<Resena> recientes(Seccion seccion) {
+        List<String> planes = idsDePlanes();
+        return seccion == Seccion.PLANES
+                ? resenaRepository.findTop50ByProductoIdInOrderByFechaDesc(planes)
+                : resenaRepository.findTop50ByProductoIdNotInOrderByFechaDesc(planes);
+    }
+
+    private List<String> idsDePlanes() {
+        return catalogo.todos().stream()
+                .filter(p -> p.categoria() == Producto.Categoria.PLAN)
+                .map(Producto::id)
                 .toList();
     }
 
