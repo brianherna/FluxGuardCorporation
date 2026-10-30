@@ -381,18 +381,15 @@
       const irALogin = () => {
         window.location.href = `login.html?solicitar=plan&plan=${tipoPlan}&redirect=${encodeURIComponent(window.location.href)}`;
       };
-      // Los planes se activan en una cuenta; el kit piloto se puede comprar como invitado
+      // Toda compra (planes y kit piloto) requiere sesión iniciada
       const userObj = localStorage.getItem("fluxg_token") ? await obtenerUsuarioSesion() : null;
-      if (!userObj && tipoPlan !== "prototipo") {
+      if (!userObj) {
         irALogin();
         return;
       }
-      const fullName = userObj ? `${userObj.nombre || "Usuario"} ${userObj.apellido || ""}`.trim() : "Compra como invitado";
+      const fullName = `${userObj.nombre || "Usuario"} ${userObj.apellido || ""}`.trim();
       document.getElementById("user-display-name").textContent = fullName;
-      document.getElementById("user-display-email").textContent = userObj
-        ? (userObj.correo || "")
-        : "Tus datos de contacto se toman de tu cuenta de PayPal al pagar";
-      if (!userObj) document.getElementById("badge-sesion")?.classList.add("d-none");
+      document.getElementById("user-display-email").textContent = userObj.correo || "";
 
       // Acción de activación
       const alertBox = document.getElementById("checkout-alert");

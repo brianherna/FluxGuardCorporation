@@ -773,7 +773,7 @@ function initPlanes() {
   if (btnProto) {
     btnProto.addEventListener("click", (e) => {
       e.preventDefault();
-      // El kit piloto se puede comprar sin cuenta
+      // pago.html pide iniciar sesión si hace falta
       window.location.href = "pago.html?plan=prototipo";
     });
   }
