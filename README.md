@@ -93,9 +93,6 @@ El cobro se confirma cuando el cliente regresa a la página, así que funciona e
 4. Se abre una ventana con la ficha (código de barras, QR, referencia, monto y fecha límite) y se descarga sola como PNG.
    El pedido queda **PENDIENTE** con su referencia y el carrito se vacía. Por ahora no se confirma el pago en tienda.
 
-### Compras sin cuenta (invitado)
+### Carrito sin cuenta, compra con cuenta
 
-El carrito y el pago funcionan sin iniciar sesión: el navegador genera un token de invitado (encabezado `X-Carrito-Invitado`)
-y el carrito se guarda con ese token. Los invitados pueden comprar el kit, accesorios y garantía; los **planes** requieren
-cuenta porque se activan en ella. El nombre y correo del invitado se toman de su cuenta de PayPal al cobrar.
-Si el invitado inicia sesión, su carrito pasa a la cuenta (`POST /api/carrito/fusionar`).
+Sin iniciar sesión se puede llenar el carrito (el navegador usa un token de invitado, encabezado `X-Carrito-Invitado`), pero **pagar requiere sesión iniciada**: `POST /api/carrito/comprar` responde 401 a los invitados. Al iniciar sesión, el carrito de invitado pasa a la cuenta (`POST /api/carrito/fusionar`). Las políticas de compra, envío y devoluciones se aceptan al crear la cuenta, junto con el Aviso de Privacidad, por eso el carrito ya no pide marcar una casilla.

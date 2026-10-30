@@ -180,22 +180,6 @@ class PagoServiceTests {
         assertTrue(pedidos.isEmpty());
     }
 
-    @Test
-    void invitadoPagaConPayPalYSeGuardanSusDatos() {
-        Comprador invitado = Comprador.invitado("token-de-invitado-0123456789");
-        carritoService.agregar(invitado, "kit-piloto", 1);
-        Pedido pedido = pagoService.iniciar(invitado, PagoService.PAYPAL).pedido();
-        when(payPal.capturar("ORDEN123")).thenReturn(new Captura("CAP9", "COMPLETED", new BigDecimal("350.00"), "MXN",
-                "Juan Prueba", "comprador@personal.example.com"));
-
-        pagoService.confirmar(pedido, "ORDEN123");
-
-        assertEquals(Pedido.PAGADO, pedido.getEstado());
-        assertEquals("Juan Prueba", pedido.getNombreCliente());
-        assertEquals("comprador@personal.example.com", pedido.getCorreoCliente());
-        assertNull(usuario.getSuscripcion()); // nadie con cuenta recibió un plan
-    }
-
     private Pedido iniciarConStripe() {
         when(stripe.estaConfigurado()).thenReturn(true);
         when(stripe.esPrueba()).thenReturn(true);
@@ -289,7 +273,7 @@ class PagoServiceTests {
         paynetConfigurado();
         carritoService.agregar(comprador, "kit-piloto", 1);
 
-        PagoService.Inicio inicio = pagoService.iniciar(comprador, PagoService.PAYNET, null);
+        PagoService.Inicio inicio = pagoService.iniciar(comprador, PagoService.PAYNET);
 
         Pedido pedido = inicio.pedido();
         assertNull(inicio.urlPago());
@@ -306,29 +290,25 @@ class PagoServiceTests {
     }
 
     @Test
-    void invitadoNecesitaNombreYCorreoParaLaFicha() {
-        paynetConfigurado();
-        Comprador invitado = Comprador.invitado("token-de-invitado-0123456789");
-        carritoService.agregar(invitado, "kit-piloto", 1);
-
-        assertThrows(PagoService.DatosClienteException.class,
-                () -> pagoService.iniciar(invitado, PagoService.PAYNET, null));
-        assertThrows(PagoService.DatosClienteException.class,
-                () -> pagoService.iniciar(invitado, PagoService.PAYNET, new PagoService.DatosCliente("Juan", "", "no-es-correo")));
-        verify(openpay, never()).crearFicha(any(), any(), any(), any());
-
-        Pedido pedido = pagoService.iniciar(invitado, PagoService.PAYNET,
-                new PagoService.DatosCliente(" Juan ", "Pérez", "Juan@Example.com")).pedido();
-        assertEquals("juan@example.com", pedido.getCorreoCliente());
-        assertEquals("Juan Pérez", pedido.getNombreCliente());
-    }
-
-    @Test
     void sinOpenpayNoSeOfreceElPagoEnTienda() {
         when(openpay.estaConfigurado()).thenReturn(false);
         carritoService.agregar(comprador, "kit-piloto", 1);
 
         assertFalse(pagoService.metodosDisponibles().contains(PagoService.PAYNET));
-        assertThrows(PagoService.PagoNoDisponibleException.class, () -> pagoService.iniciar(comprador, PagoService.PAYNET, null));
+        assertThrows(PagoService.PagoNoDisponibleException.class, () -> pagoService.iniciar(comprador, PagoService.PAYNET));
+    }
+
+    @Test
+    void sinSesionNoSePuedeComprar() {
+        paynetConfigurado();
+        Comprador invitado = Comprador.invitado("token-de-invitado-0123456789");
+        carritoService.agregar(invitado, "kit-piloto", 1); // llenar el carrito sí se puede
+
+        for (String metodo : List.of(PagoService.PAYPAL, PagoService.STRIPE, PagoService.PAYNET)) {
+            assertThrows(PagoService.SesionRequeridaException.class, () -> pagoService.iniciar(invitado, metodo));
+        }
+        assertTrue(pedidos.isEmpty());
+        verify(payPal, never()).crearOrden(any());
+        verify(openpay, never()).crearFicha(any(), any(), any(), any());
     }
 }

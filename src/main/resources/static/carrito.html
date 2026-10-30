@@ -73,7 +73,7 @@
           <span>Cancelación, cambios y reembolsos.</span>
         </button>
       </div>
-      <p class="checkout-policies-note">Al pagar aceptas nuestras políticas. Consulta también el <a href="#" data-sobrepantalla="privacidad">Aviso de Privacidad</a>.</p>
+      <p class="checkout-policies-note">Aceptaste estas políticas al crear tu cuenta y aplican a cada compra. Consulta también el <a href="#" data-sobrepantalla="privacidad">Aviso de Privacidad</a>.</p>
     </section>
   </main>
 
@@ -109,12 +109,11 @@
 
     // Métodos de pago que el servidor tiene configurados ("paypal", "stripe", "paynet")
     let metodosPago = ["paypal"];
-    // Casilla de aceptación de políticas: se conserva aunque el resumen se vuelva a dibujar
-    let politicasAceptadas = false;
+    // Para pagar hace falta sesión iniciada; el carrito sí se puede llenar como invitado
+    const conSesion = () => !!localStorage.getItem("fluxg_token");
 
     async function initCheckoutCarrito() {
-      // No hace falta iniciar sesión: sin sesión se paga como invitado
-      if (localStorage.getItem("fluxg_token")) await obtenerUsuarioSesion();
+      if (conSesion()) await obtenerUsuarioSesion();
       try {
         const res = await fetch(`${API_BASE}/api/pagos/metodos`);
         const data = await res.json();
@@ -207,20 +206,26 @@
             metodosPago.includes("paypal") ? `<button type="button" class="plan-button w-100 mb-2" data-metodo="paypal">PAGAR CON PAYPAL <i class="bi bi-paypal"></i></button>` : "",
             metodosPago.includes("paynet") ? `<button type="button" class="plan-button w-100" data-metodo="paynet">PAGAR EN TIENDA <i class="bi bi-shop"></i></button>` : ""
           ].join("");
+      // Sin sesión: en lugar de los botones de pago, se pide iniciar sesión (el carrito se pasa a la cuenta)
+      const regreso = encodeURIComponent("carrito.html");
+      const acciones = conSesion()
+        ? (botones || `<p class="m-0">Los pagos no están disponibles en este momento.</p>`)
+        : `<div class="checkout-login">
+             <p><i class="bi bi-person-lock me-1"></i> Inicia sesión para completar tu compra. Tu carrito se guardará en tu cuenta.</p>
+             <a href="login.html?redirect=${regreso}" class="plan-button cart-checkout w-100 mb-2">INICIAR SESIÓN PARA PAGAR <i class="bi bi-arrow-up-right"></i></a>
+             <a href="crear-cuenta.html?redirect=${regreso}" class="plan-button w-100">CREAR UNA CUENTA <i class="bi bi-person-plus"></i></a>
+           </div>`;
       box.innerHTML = `
         <div class="cart-lines">${lineasCarritoHtml(carrito)}</div>
         <div class="cart-total"><span>TOTAL · IVA INCLUIDO</span><strong>${dinero(carrito.total)}</strong></div>
-        <div class="privacy-consent checkout-consent">
-          <input type="checkbox" id="acepta-politicas"${politicasAceptadas ? " checked" : ""}>
-          <label for="acepta-politicas">
-            He leído y acepto las
-            <a href="#" data-sobrepantalla="politicas" data-seccion="compra">políticas de compra</a>,
-            <a href="#" data-sobrepantalla="politicas" data-seccion="envio">envío</a> y
-            <a href="#" data-sobrepantalla="politicas" data-seccion="devoluciones">devoluciones</a>.
-          </label>
-        </div>
-        ${botones || `<p class="m-0">Los pagos no están disponibles en este momento.</p>`}
-        ${gratis ? "" : `
+        ${acciones}
+        <p class="checkout-note mb-0">
+          <i class="bi bi-shield-check me-1"></i> Tu compra se rige por las
+          <a href="#" data-sobrepantalla="politicas" data-seccion="compra">políticas de compra</a>,
+          <a href="#" data-sobrepantalla="politicas" data-seccion="envio">envío</a> y
+          <a href="#" data-sobrepantalla="politicas" data-seccion="devoluciones">devoluciones</a> que aceptaste al crear tu cuenta.
+        </p>
+        ${gratis || !conSesion() ? "" : `
         <p class="checkout-note">
           <i class="bi bi-info-circle me-1"></i> Modo de prueba: no se cobra dinero real.
           ${metodosPago.includes("stripe") ? `Con tarjeta usa <strong>4242 4242 4242 4242</strong>, cualquier fecha futura y cualquier CVC.` : ""}
@@ -230,39 +235,19 @@
       if (carrito.avisos?.length) showAlert(alertBox, "info", carrito.avisos.map(escapeHtml).join("<br>"));
       conectarLineasCarrito(box, carrito, alertBox);
       box.querySelectorAll("button[data-metodo]").forEach(b => b.addEventListener("click", iniciarPago));
-
-      // Los botones de pago se habilitan solo con la casilla de políticas marcada
-      box.querySelector("#acepta-politicas").addEventListener("change", event => {
-        politicasAceptadas = event.target.checked;
-        if (politicasAceptadas) alertBox.classList.add("d-none");
-        actualizarBotonesPago();
-      });
-      actualizarBotonesPago();
     }
 
-    function actualizarBotonesPago() {
-      document.querySelectorAll("button[data-metodo]").forEach(b => {
-        b.disabled = !politicasAceptadas;
-        b.title = politicasAceptadas ? "" : "Marca la casilla de políticas para continuar";
-      });
-    }
-
-    async function iniciarPago(event) {
+    function iniciarPago(event) {
       const boton = event.currentTarget;
-      const metodo = boton.dataset.metodo;
-      // Pago en tienda sin sesión: primero se piden nombre y correo en la ventana flotante
-      if (metodo === "paynet" && !localStorage.getItem("fluxg_token")) {
-        pedirDatosFicha();
-        return;
-      }
-      await comprar(metodo, null, boton);
+      return comprar(boton.dataset.metodo, boton);
     }
 
-    async function comprar(metodo, datos, boton) {
+    async function comprar(metodo, boton) {
       const textoOriginal = boton?.innerHTML;
       const alertBox = document.getElementById("checkout-alert");
-      if (!politicasAceptadas) {
-        return showAlert(alertBox, "danger", "Debes aceptar las políticas de compra, envío y devoluciones para continuar.");
+      if (!conSesion()) {
+        window.location.href = "login.html?redirect=" + encodeURIComponent("carrito.html");
+        return false;
       }
       document.querySelectorAll("button[data-metodo]").forEach(b => b.disabled = true);
       if (boton) {
@@ -270,11 +255,12 @@
         boton.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> ${destino}`;
       }
       try {
-        const response = await apiFetch(`/api/carrito/comprar?metodo=${encodeURIComponent(metodo)}`, {
-          method: "POST",
-          headers: datos ? { "Content-Type": "application/json" } : {},
-          body: datos ? JSON.stringify(datos) : undefined
-        });
+        const response = await apiFetch(`/api/carrito/comprar?metodo=${encodeURIComponent(metodo)}`, { method: "POST" });
+        if (response.status === 401) {
+          // La sesión venció: se vuelve a iniciar y el carrito sigue guardado
+          window.location.href = "login.html?redirect=" + encodeURIComponent("carrito.html");
+          return false;
+        }
         const data = await response.json().catch(() => null);
         if (!response.ok || !data?.success) {
           // El servidor pudo ajustar el carrito: se vuelve a cargar antes de mostrar el error
@@ -299,7 +285,7 @@
         return true;
       } catch (error) {
         showAlert(alertBox, "danger", escapeHtml(error.message));
-        actualizarBotonesPago();
+        document.querySelectorAll("button[data-metodo]").forEach(b => b.disabled = false);
         if (boton) boton.innerHTML = textoOriginal;
         return false;
       }
@@ -309,42 +295,6 @@
 
     function ventanaFicha() {
       return bootstrap.Modal.getOrCreateInstance(document.getElementById("fichaModal"));
-    }
-
-    // Paso 1 (solo invitados): nombre y correo, que Openpay pide para generar la ficha
-    function pedirDatosFicha() {
-      document.getElementById("fichaTitulo").textContent = "Tus datos";
-      document.getElementById("fichaCuerpo").innerHTML = `
-        <p class="ficha-texto">Para generar tu ficha de pago en tienda necesitamos tu nombre y un correo de contacto.</p>
-        <form id="fichaDatos" novalidate>
-          <div id="fichaDatosAlerta" class="d-none"></div>
-          <label class="ficha-label" for="fichaNombre">Nombre *</label>
-          <input class="ficha-input" id="fichaNombre" maxlength="100" autocomplete="given-name" required>
-          <label class="ficha-label" for="fichaApellido">Apellido</label>
-          <input class="ficha-input" id="fichaApellido" maxlength="100" autocomplete="family-name">
-          <label class="ficha-label" for="fichaCorreo">Correo electrónico *</label>
-          <input class="ficha-input" id="fichaCorreo" type="email" maxlength="150" autocomplete="email" required>
-          <button type="submit" class="plan-button cart-checkout w-100 mt-3" id="fichaGenerar">GENERAR FICHA <i class="bi bi-upc-scan"></i></button>
-        </form>`;
-      ventanaFicha().show();
-      document.getElementById("fichaDatos").addEventListener("submit", async event => {
-        event.preventDefault();
-        const valor = id => document.getElementById(id).value.trim();
-        const datos = { nombre: valor("fichaNombre"), apellido: valor("fichaApellido"), correo: valor("fichaCorreo") };
-        const alerta = document.getElementById("fichaDatosAlerta");
-        if (!datos.nombre || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(datos.correo)) {
-          return showAlert(alerta, "danger", "Escribe tu nombre y un correo válido.");
-        }
-        const boton = document.getElementById("fichaGenerar");
-        boton.disabled = true;
-        boton.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> GENERANDO TU FICHA...`;
-        const ok = await comprar("paynet", datos, null);
-        if (!ok) {
-          showAlert(alerta, "danger", escapeHtml(document.getElementById("checkout-alert").innerText || "No se pudo generar la ficha."));
-          boton.disabled = false;
-          boton.innerHTML = `GENERAR FICHA <i class="bi bi-upc-scan"></i>`;
-        }
-      });
     }
 
     const fechaLarga = valor => valor

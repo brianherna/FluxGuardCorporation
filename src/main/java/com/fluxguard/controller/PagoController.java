@@ -12,7 +12,7 @@ import com.fluxguard.service.CarritoService.CarritoException;
 import com.fluxguard.service.Comprador;
 import com.fluxguard.service.PagoService;
 import com.fluxguard.service.OpenpayService.OpenpayException;
-import com.fluxguard.service.PagoService.DatosClienteException;
+import com.fluxguard.service.PagoService.SesionRequeridaException;
 import com.fluxguard.service.PagoService.PagoNoDisponibleException;
 import com.fluxguard.service.PayPalService.PayPalException;
 import com.fluxguard.service.SesionService;
@@ -76,20 +76,19 @@ public class PagoController {
     /**
      * Crea el pedido con el carrito actual (?metodo=paypal | stripe | paynet).
      * PayPal y Stripe devuelven la URL a la que hay que redirigir; Paynet devuelve el pedido con la referencia
-     * y el código de barras de la ficha. Para Paynet, un invitado manda en el cuerpo su nombre y correo.
+     * y el código de barras de la ficha. Exige sesión iniciada: un invitado recibe 401 y debe iniciar sesión.
      */
     @PostMapping("/carrito/comprar")
     public ResponseEntity<ApiResponse<UsuarioDto>> comprar(@RequestHeader(value = "Authorization", required = false) String authorization,
                                                           @RequestHeader(value = CarritoController.INVITADO, required = false) String invitado,
-                                                          @RequestParam(value = "metodo", defaultValue = PagoService.PAYPAL) String metodo,
-                                                          @RequestBody(required = false) PagoService.DatosCliente datos) {
+                                                          @RequestParam(value = "metodo", defaultValue = PagoService.PAYPAL) String metodo) {
         Optional<Comprador> comprador = sesionService.compradorDesde(authorization, invitado);
         if (comprador.isEmpty()) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error("Tu sesión expiró. Recarga la página."));
         }
         String proveedor = PagoService.STRIPE.equals(metodo) ? "Stripe" : PagoService.PAYNET.equals(metodo) ? "Paynet" : "PayPal";
         try {
-            PagoService.Inicio inicio = pagoService.iniciar(comprador.get(), metodo, datos);
+            PagoService.Inicio inicio = pagoService.iniciar(comprador.get(), metodo);
             boolean ficha = inicio.pedido().getReferenciaPago() != null;
             ApiResponse<UsuarioDto> response = ApiResponse.ok(ficha
                     ? "Tu ficha de pago del pedido " + inicio.pedido().getFolio() + " está lista. Págala en cualquier tienda participante."
@@ -102,7 +101,9 @@ public class PagoController {
                 usuarioRepository.findById(comprador.get().clave()).map(UsuarioDto::de).ifPresent(response::setUsuario);
             }
             return ResponseEntity.ok(response);
-        } catch (CarritoException | DatosClienteException e) {
+        } catch (SesionRequeridaException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(ApiResponse.error(e.getMessage()));
+        } catch (CarritoException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(ApiResponse.error(e.getMessage()));
         } catch (PagoNoDisponibleException e) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(ApiResponse.error(e.getMessage()));
