@@ -1452,17 +1452,34 @@ function conectarFormularioResena(form, folio) {
   });
 }
 
-async function mostrarCarruselResenas(contenedor) {
+// Sin sesión: solo reseñas positivas (/destacadas). Con sesión: todas, buenas y malas, con su promedio.
+// origen: "tienda" (kit, accesorios y servicios) o "planes" (solo reseñas de planes, para planes.html).
+async function mostrarCarruselResenas(contenedor, origen = "tienda") {
   let resenas = [];
+  let todas = !!localStorage.getItem("fluxg_token");
+  const filtro = `?seccion=${encodeURIComponent(origen)}`;
   try {
-    const response = await fetch(`${API_BASE}/api/resenas/destacadas`);
+    let response = todas ? await apiFetch(`/api/resenas${filtro}`) : await fetch(`${API_BASE}/api/resenas/destacadas${filtro}`);
+    if (todas && response.status === 401) {
+      // La sesión venció: se muestran solo las positivas, como a cualquier visitante
+      todas = false;
+      response = await fetch(`${API_BASE}/api/resenas/destacadas${filtro}`);
+    }
     const data = await response.json().catch(() => null);
     if (response.ok && data?.success) resenas = data.resenas || [];
   } catch (_) {}
 
+  const promedio = resenas.length ? resenas.reduce((suma, r) => suma + r.calificacion, 0) / resenas.length : 0;
+  const resumen = todas && resenas.length ? `
+    <div class="review-summary">
+      <strong>${promedio.toFixed(1)}</strong>
+      <div class="review-stars-static" aria-label="Promedio de ${promedio.toFixed(1)} de 5 estrellas">${estrellasHtml(Math.round(promedio))}</div>
+      <span>${resenas.length} ${resenas.length === 1 ? "opinión" : "opiniones"} de clientes</span>
+    </div>` : "";
+  const titulo = origen === "planes" ? "Lo que opinan de nuestros planes" : "Lo que dicen de FluxGuard";
   const encabezado = `
     <span class="section-eyebrow"><span></span> OPINIONES DE CLIENTES</span>
-    <h3 class="review-heading">Lo que dicen de FluxGuard</h3>`;
+    <h3 class="review-heading">${titulo}</h3>${resumen}`;
   if (!resenas.length) {
     contenedor.innerHTML = `
       <section class="review-section">${encabezado}
@@ -1485,7 +1502,7 @@ async function mostrarCarruselResenas(contenedor) {
           ${resenas.map((r, i) => `
             <figure class="review-slide" role="group" aria-roledescription="reseña" aria-label="${i + 1} de ${resenas.length}">
               <div class="review-stars-static" aria-label="${r.calificacion} de 5 estrellas">${estrellasHtml(r.calificacion)}</div>
-              <blockquote>&ldquo;${escapeHtml(r.comentario)}&rdquo;</blockquote>
+              ${r.comentario ? `<blockquote>&ldquo;${escapeHtml(r.comentario)}&rdquo;</blockquote>` : `<blockquote class="review-sin-comentario">Calificó sin dejar comentario.</blockquote>`}
               <figcaption><strong>${escapeHtml(r.autor)}</strong> · ${escapeHtml(r.productoNombre)}<span>${escapeHtml(fecha(r.fecha))}</span></figcaption>
             </figure>`).join("")}
         </div>

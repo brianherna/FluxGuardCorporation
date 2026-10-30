@@ -37,10 +37,18 @@ class ResenaServiceTests {
         });
         when(resenaRepository.existsByUsuarioIdAndProductoId(anyString(), anyString())).thenAnswer(inv -> resenas.stream()
                 .anyMatch(r -> r.getUsuarioId().equals(inv.getArgument(0)) && r.getProductoId().equals(inv.getArgument(1))));
-        when(resenaRepository.findTop30ByCalificacionGreaterThanEqualOrderByFechaDesc(anyInt())).thenAnswer(inv -> resenas.stream()
-                .filter(r -> r.getCalificacion() >= inv.<Integer>getArgument(0)).toList());
+        when(resenaRepository.findTop30ByCalificacionGreaterThanEqualAndProductoIdInOrderByFechaDesc(anyInt(), anyCollection()))
+                .thenAnswer(inv -> resenas.stream().filter(r -> r.getCalificacion() >= inv.<Integer>getArgument(0)
+                        && inv.<java.util.Collection<String>>getArgument(1).contains(r.getProductoId())).toList());
+        when(resenaRepository.findTop30ByCalificacionGreaterThanEqualAndProductoIdNotInOrderByFechaDesc(anyInt(), anyCollection()))
+                .thenAnswer(inv -> resenas.stream().filter(r -> r.getCalificacion() >= inv.<Integer>getArgument(0)
+                        && !inv.<java.util.Collection<String>>getArgument(1).contains(r.getProductoId())).toList());
+        when(resenaRepository.findTop50ByProductoIdInOrderByFechaDesc(anyCollection())).thenAnswer(inv -> resenas.stream()
+                .filter(r -> inv.<java.util.Collection<String>>getArgument(0).contains(r.getProductoId())).toList());
+        when(resenaRepository.findTop50ByProductoIdNotInOrderByFechaDesc(anyCollection())).thenAnswer(inv -> resenas.stream()
+                .filter(r -> !inv.<java.util.Collection<String>>getArgument(0).contains(r.getProductoId())).toList());
 
-        service = new ResenaService(resenaRepository, pedidoRepository);
+        service = new ResenaService(resenaRepository, pedidoRepository, new com.fluxguard.service.CatalogoService());
         usuario = new Usuario("Ana María", "lopez", "ana@fluxguard.io", "hash");
         usuario.setId("u1");
     }
@@ -97,9 +105,36 @@ class ResenaServiceTests {
         resenas.add(new Resena("u2", "kit-piloto", "Kit", "F2", "Luis P.", 4, "", LocalDateTime.now()));
         resenas.add(new Resena("u3", "kit-piloto", "Kit", "F3", "Eva R.", 2, "No me gustó", LocalDateTime.now()));
 
-        List<Resena> destacadas = service.destacadas();
+        List<Resena> destacadas = service.destacadas(ResenaService.Seccion.TIENDA);
 
         assertEquals(1, destacadas.size());
         assertEquals("Ana L.", destacadas.get(0).getAutor());
+    }
+
+    @Test
+    void conSesionSeVenTodasLasResenasBuenasYMalas() {
+        resenas.add(new Resena("u1", "kit-piloto", "Kit", "F1", "Ana L.", 5, "Excelente", LocalDateTime.now()));
+        resenas.add(new Resena("u2", "kit-piloto", "Kit", "F2", "Luis P.", 4, "", LocalDateTime.now()));
+        resenas.add(new Resena("u3", "kit-piloto", "Kit", "F3", "Eva R.", 1, "No me gustó", LocalDateTime.now()));
+
+        assertEquals(3, service.recientes(ResenaService.Seccion.TIENDA).size());
+        // Sin sesión siguen saliendo solo las positivas con comentario
+        assertEquals(List.of("Ana L."), service.destacadas(ResenaService.Seccion.TIENDA).stream().map(Resena::getAutor).toList());
+    }
+
+    @Test
+    void lasResenasDePlanesVanEnPlanesYNoEnLaTienda() {
+        resenas.add(new Resena("u1", "kit-piloto", "Kit Piloto FluxGuard", "F1", "Ana L.", 5, "Excelente kit", LocalDateTime.now()));
+        resenas.add(new Resena("u2", "plan-standard", "Plan Standard", "F2", "Luis P.", 5, "Las alertas me salvaron", LocalDateTime.now()));
+        resenas.add(new Resena("u3", "plan-free", "Plan Free", "F3", "Eva R.", 2, "Se queda corto", LocalDateTime.now()));
+
+        assertEquals(List.of("kit-piloto"), service.recientes(ResenaService.Seccion.TIENDA).stream().map(Resena::getProductoId).toList());
+        assertEquals(List.of("kit-piloto"), service.destacadas(ResenaService.Seccion.TIENDA).stream().map(Resena::getProductoId).toList());
+
+        assertEquals(List.of("plan-standard", "plan-free"), service.recientes(ResenaService.Seccion.PLANES).stream().map(Resena::getProductoId).toList());
+        // Sin sesión, en Planes solo la positiva
+        assertEquals(List.of("plan-standard"), service.destacadas(ResenaService.Seccion.PLANES).stream().map(Resena::getProductoId).toList());
+        assertEquals(ResenaService.Seccion.PLANES, ResenaService.Seccion.de("planes"));
+        assertEquals(ResenaService.Seccion.TIENDA, ResenaService.Seccion.de("cualquier-cosa"));
     }
 }

@@ -1942,3 +1942,7 @@ select {
 .ficha-input:focus{border-color:var(--gold)}
 @media(max-width:576px){.ficha-acciones,.ficha-datos{grid-template-columns:1fr}.ficha-modal .modal-title{font-size:32px}}
 a.flux-opinar-btn{display:inline-flex;align-items:center;gap:5px;text-decoration:none}
+.review-summary{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:6px 0 16px}
+.review-summary strong{font-family:"Barlow Condensed";font-size:42px;line-height:1}
+.review-summary span{color:#a39db0;font-size:12px}
+.review-sin-comentario{color:#8d8897;font-style:italic}

@@ -13,7 +13,11 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Optional;
 
-/** Reseñas post-compra: opinar requiere sesión y un pedido pagado; las destacadas son públicas. */
+/**
+ * Reseñas post-compra: opinar requiere sesión y un pedido pagado.
+ * Sin sesión solo se publican las positivas (/destacadas); con sesión se ven todas, buenas y malas.
+ * ?seccion=planes devuelve las de los planes (para planes.html); sin él, las de la tienda.
+ */
 @RestController
 @RequestMapping("/api/resenas")
 public class ResenaController {
@@ -58,11 +62,24 @@ public class ResenaController {
         return ResponseEntity.ok(response);
     }
 
+    /** Todas las reseñas (buenas y malas) para quien inició sesión. Sin sesión no se entregan las negativas. */
+    @GetMapping
+    public ResponseEntity<ApiResponse<Void>> todas(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                                   @RequestParam(value = "seccion", defaultValue = "tienda") String seccion) {
+        if (sesionService.usuarioDesde(authorization).isEmpty()) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(ApiResponse.error("Inicia sesión para ver todas las opiniones de los clientes."));
+        }
+        ApiResponse<Void> response = ApiResponse.ok("Opiniones de clientes");
+        response.setResenas(resenaService.recientes(ResenaService.Seccion.de(seccion)).stream().map(ResenaDto::de).toList());
+        return ResponseEntity.ok(response);
+    }
+
     /** Reseñas positivas para el carrusel que ven los visitantes sin sesión. */
     @GetMapping("/destacadas")
-    public ResponseEntity<ApiResponse<Void>> destacadas() {
+    public ResponseEntity<ApiResponse<Void>> destacadas(@RequestParam(value = "seccion", defaultValue = "tienda") String seccion) {
         ApiResponse<Void> response = ApiResponse.ok("Reseñas destacadas");
-        response.setResenas(resenaService.destacadas().stream().map(ResenaDto::de).toList());
+        response.setResenas(resenaService.destacadas(ResenaService.Seccion.de(seccion)).stream().map(ResenaDto::de).toList());
         return ResponseEntity.ok(response);
     }
 }

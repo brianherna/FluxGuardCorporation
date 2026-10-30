@@ -146,7 +146,7 @@
     </p>
   </section>
 
-  <!-- OPINIONES: carrusel de reseñas positivas, solo para quien no ha iniciado sesión -->
+  <!-- OPINIONES: sin sesión solo reseñas positivas; con sesión todas, buenas y malas -->
   <div class="plans-section shop-reviews" id="tienda-resenas" hidden></div>
 
   <footer class="plans-footer">
@@ -160,12 +160,11 @@
     document.addEventListener("DOMContentLoaded", initTienda);
 
     async function initTienda() {
-      // Sin sesión se muestran opiniones de otros clientes; no depende de que cargue el catálogo
-      if (!localStorage.getItem("fluxg_token")) {
-        const resenas = document.getElementById("tienda-resenas");
-        resenas.hidden = false;
-        mostrarCarruselResenas(resenas);
-      }
+      // Opiniones de clientes sobre los productos de la tienda (las de los planes van en planes.html):
+      // sin sesión solo las positivas; con sesión todas (buenas y malas). No depende de que cargue el catálogo.
+      const resenas = document.getElementById("tienda-resenas");
+      resenas.hidden = false;
+      mostrarCarruselResenas(resenas, "tienda");
 
       const status = document.getElementById("shop-status");
       let productos = [];
