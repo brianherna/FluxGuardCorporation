@@ -17,6 +17,8 @@ Plataforma web de monitoreo eléctrico IoT. Backend en Spring Boot 3.5 (Java 17)
 | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | Alternativa a Brevo: si `RESEND_API_KEY` tiene valor, los correos se envían con Resend. `RESEND_FROM_EMAIL` vacío usa `BREVO_SENDER_EMAIL` |
 | `CORS_ALLOWED_ORIGINS` | Dominios extra que pueden llamar a la API (separados por coma) |
 | `ADMIN_API_KEY` | Clave para `GET /api/prospectos` (encabezado `X-Admin-Key`). Vacía = deshabilitado |
+| `OPENPAY_MERCHANT_ID`, `OPENPAY_PRIVATE_KEY` | Pago en tienda con Paynet (Openpay). Vacías = no aparece "Pagar en tienda" |
+| `OPENPAY_PRODUCTION` | `false` (sandbox, fichas de prueba, por defecto) o `true` |
 | `CONTACTO_CORREO_EQUIPO` | Correo que recibe el aviso de cada solicitud del formulario de contacto (y el "Responder a" del correo al cliente) |
 | `PAYPAL_CLIENT_ID`, `PAYPAL_CLIENT_SECRET` | Credenciales de la app de PayPal (pestaña Sandbox para pruebas) |
 | `PAYPAL_MODE` | `sandbox` (pagos de prueba, por defecto) o `live` (pagos reales) |
@@ -52,7 +54,7 @@ docker build -t fluxguard . && docker run --env-file .env -p 8080:8080 fluxguard
 | GET | `/api/carrito` | Carrito de la sesión |
 | POST | `/api/carrito/items` | Agrega un producto (`productoId`, `cantidad`) |
 | PUT / DELETE | `/api/carrito/items/{productoId}` | Cambia la cantidad o quita el producto |
-| GET | `/api/pagos/metodos` | Métodos de pago configurados (`paypal`, `stripe`) |
+| GET | `/api/pagos/metodos` | Métodos de pago configurados (`paypal`, `stripe`, `paynet`) |
 | POST | `/api/carrito/comprar?metodo=paypal\|stripe` | Crea el pedido pendiente y devuelve `urlPago` (PayPal o Stripe) |
 | GET | `/api/pedidos/{folio}` | Estado de un pedido del usuario |
 | POST | `/api/pedidos/{folio}/confirmar?token=` | Confirma el pago (orden de PayPal o sesión de Stripe); si se completa activa el plan y vacía el carrito |
@@ -82,6 +84,14 @@ El cobro se confirma cuando el cliente regresa a la página, así que funciona e
 3. (Recomendado en Render) En **Developers > Webhooks > Add endpoint** pon `https://fluxguardcorporation.com/api/pagos/stripe/webhook`,
    elige el evento `checkout.session.completed` y copia el **Signing secret** (`whsec_...`) a `STRIPE_WEBHOOK_SECRET`.
 4. En el carrito aparece **Pagar con tarjeta**. Tarjeta de prueba: `4242 4242 4242 4242`, cualquier fecha futura y cualquier CVC.
+
+## Pago en tienda (Paynet con Openpay, sandbox)
+
+1. Regístrate en https://sandbox.openpay.mx y entra a tu panel.
+2. Copia el **ID de comercio** a `OPENPAY_MERCHANT_ID` y la **llave privada** (`sk_...`) a `OPENPAY_PRIVATE_KEY`.
+3. En el carrito aparece **Pagar en tienda**. Un invitado escribe su nombre y correo; con sesión se usan los de la cuenta.
+4. Se abre una ventana con la ficha (código de barras, QR, referencia, monto y fecha límite) y se descarga sola como PNG.
+   El pedido queda **PENDIENTE** con su referencia y el carrito se vacía. Por ahora no se confirma el pago en tienda.
 
 ### Compras sin cuenta (invitado)
 

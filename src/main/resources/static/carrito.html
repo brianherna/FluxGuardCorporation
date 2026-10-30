@@ -82,14 +82,32 @@
     <a href="tienda.html">SEGUIR COMPRANDO <i class="bi bi-arrow-up-right"></i></a>
   </footer>
 
+  <!-- Ventana flotante del pago en tienda: primero pide nombre y correo (invitados) y luego muestra la ficha -->
+  <div class="modal fade ficha-modal" id="fichaModal" tabindex="-1" aria-labelledby="fichaTitulo" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <div>
+            <span class="cart-panel-kicker">FLUXGUARD / PAGO EN TIENDA</span>
+            <h2 class="modal-title" id="fichaTitulo">Ficha de pago</h2>
+          </div>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Cerrar"></button>
+        </div>
+        <div class="modal-body" id="fichaCuerpo"></div>
+      </div>
+    </div>
+  </div>
+
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/qrcode-generator@1.4.4/qrcode.js"></script>
   <script src="js/main.js"></script>
   <script>
     document.addEventListener("DOMContentLoaded", initCheckoutCarrito);
     // Si el carrito cambia desde el panel lateral, se vuelve a dibujar el resumen
     document.addEventListener("carrito:actualizado", event => renderResumen(event.detail));
 
-    // Métodos de pago que el servidor tiene configurados ("paypal", "stripe")
+    // Métodos de pago que el servidor tiene configurados ("paypal", "stripe", "paynet")
     let metodosPago = ["paypal"];
     // Casilla de aceptación de políticas: se conserva aunque el resumen se vuelva a dibujar
     let politicasAceptadas = false;
@@ -105,6 +123,13 @@
 
       // Regreso desde PayPal o Stripe: carrito.html?pedido=FOLIO&token=REFERENCIA (pagado) o &cancelado=1
       const params = new URLSearchParams(window.location.search);
+      // Desde el historial de compras: carrito.html?ficha=FOLIO vuelve a abrir la ficha de pago en tienda
+      const fichaDe = params.get("ficha");
+      if (fichaDe) {
+        history.replaceState(null, "", "carrito.html");
+        await abrirFichaGuardada(fichaDe);
+        return;
+      }
       const folio = params.get("pedido");
       if (folio) {
         // Se limpia la URL para que recargar la página no repita la confirmación
@@ -179,7 +204,8 @@
         ? `<button type="button" class="plan-button cart-checkout w-100" data-metodo="paypal">CONFIRMAR PEDIDO <i class="bi bi-arrow-up-right"></i></button>`
         : [
             metodosPago.includes("stripe") ? `<button type="button" class="plan-button cart-checkout w-100 mb-2" data-metodo="stripe">PAGAR CON TARJETA <i class="bi bi-credit-card"></i></button>` : "",
-            metodosPago.includes("paypal") ? `<button type="button" class="plan-button w-100" data-metodo="paypal">PAGAR CON PAYPAL <i class="bi bi-paypal"></i></button>` : ""
+            metodosPago.includes("paypal") ? `<button type="button" class="plan-button w-100 mb-2" data-metodo="paypal">PAGAR CON PAYPAL <i class="bi bi-paypal"></i></button>` : "",
+            metodosPago.includes("paynet") ? `<button type="button" class="plan-button w-100" data-metodo="paynet">PAGAR EN TIENDA <i class="bi bi-shop"></i></button>` : ""
           ].join("");
       box.innerHTML = `
         <div class="cart-lines">${lineasCarritoHtml(carrito)}</div>
@@ -199,7 +225,7 @@
           <i class="bi bi-info-circle me-1"></i> Modo de prueba: no se cobra dinero real.
           ${metodosPago.includes("stripe") ? `Con tarjeta usa <strong>4242 4242 4242 4242</strong>, cualquier fecha futura y cualquier CVC.` : ""}
           ${metodosPago.includes("paypal") ? `Con PayPal inicia sesión con una <strong>cuenta compradora de prueba</strong>.` : ""}
-          Al pagar regresarás aquí y tu pedido se confirmará.
+          ${metodosPago.includes("paynet") ? `En tienda recibes una ficha con código de barras y QR para pagar en efectivo.` : ""}
         </p>`}`;
       if (carrito.avisos?.length) showAlert(alertBox, "info", carrito.avisos.map(escapeHtml).join("<br>"));
       conectarLineasCarrito(box, carrito, alertBox);
@@ -224,34 +250,254 @@
     async function iniciarPago(event) {
       const boton = event.currentTarget;
       const metodo = boton.dataset.metodo;
-      const textoOriginal = boton.innerHTML;
+      // Pago en tienda sin sesión: primero se piden nombre y correo en la ventana flotante
+      if (metodo === "paynet" && !localStorage.getItem("fluxg_token")) {
+        pedirDatosFicha();
+        return;
+      }
+      await comprar(metodo, null, boton);
+    }
+
+    async function comprar(metodo, datos, boton) {
+      const textoOriginal = boton?.innerHTML;
       const alertBox = document.getElementById("checkout-alert");
       if (!politicasAceptadas) {
         return showAlert(alertBox, "danger", "Debes aceptar las políticas de compra, envío y devoluciones para continuar.");
       }
       document.querySelectorAll("button[data-metodo]").forEach(b => b.disabled = true);
-      boton.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> CONECTANDO CON ${metodo === "stripe" ? "STRIPE" : "PAYPAL"}...`;
+      if (boton) {
+        const destino = { stripe: "CONECTANDO CON STRIPE...", paynet: "GENERANDO TU FICHA...", paypal: "CONECTANDO CON PAYPAL..." }[metodo];
+        boton.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> ${destino}`;
+      }
       try {
-        const response = await apiFetch(`/api/carrito/comprar?metodo=${encodeURIComponent(metodo)}`, { method: "POST" });
+        const response = await apiFetch(`/api/carrito/comprar?metodo=${encodeURIComponent(metodo)}`, {
+          method: "POST",
+          headers: datos ? { "Content-Type": "application/json" } : {},
+          body: datos ? JSON.stringify(datos) : undefined
+        });
         const data = await response.json().catch(() => null);
         if (!response.ok || !data?.success) {
           // El servidor pudo ajustar el carrito: se vuelve a cargar antes de mostrar el error
           renderResumen(await cargarCarrito().catch(() => null));
           throw new Error(data?.message || "No se pudo iniciar el pago.");
         }
+        if (data.pedido?.referenciaPago) {
+          // Pago en tienda: el pedido queda apartado y se muestra la ficha en la ventana flotante
+          renderPanelCarrito({ lineas: [], total: 0, cantidadArticulos: 0 });
+          mostrarPedidoEnTienda(data.pedido);
+          mostrarFicha(data.pedido);
+          return true;
+        }
         if (data.urlPago) {
           window.location.href = data.urlPago;
-          return;
+          return true;
         }
         // Pedido de $0: se confirma sin pasar por la página de pago
         if (data.usuario) actualizarUsuario(data.usuario);
         renderPanelCarrito({ lineas: [], total: 0, cantidadArticulos: 0 });
         mostrarExito(data.pedido, data.usuario);
+        return true;
       } catch (error) {
         showAlert(alertBox, "danger", escapeHtml(error.message));
         actualizarBotonesPago();
-        boton.innerHTML = textoOriginal;
+        if (boton) boton.innerHTML = textoOriginal;
+        return false;
       }
+    }
+
+    // ===== Pago en tienda (Paynet) =====
+
+    function ventanaFicha() {
+      return bootstrap.Modal.getOrCreateInstance(document.getElementById("fichaModal"));
+    }
+
+    // Paso 1 (solo invitados): nombre y correo, que Openpay pide para generar la ficha
+    function pedirDatosFicha() {
+      document.getElementById("fichaTitulo").textContent = "Tus datos";
+      document.getElementById("fichaCuerpo").innerHTML = `
+        <p class="ficha-texto">Para generar tu ficha de pago en tienda necesitamos tu nombre y un correo de contacto.</p>
+        <form id="fichaDatos" novalidate>
+          <div id="fichaDatosAlerta" class="d-none"></div>
+          <label class="ficha-label" for="fichaNombre">Nombre *</label>
+          <input class="ficha-input" id="fichaNombre" maxlength="100" autocomplete="given-name" required>
+          <label class="ficha-label" for="fichaApellido">Apellido</label>
+          <input class="ficha-input" id="fichaApellido" maxlength="100" autocomplete="family-name">
+          <label class="ficha-label" for="fichaCorreo">Correo electrónico *</label>
+          <input class="ficha-input" id="fichaCorreo" type="email" maxlength="150" autocomplete="email" required>
+          <button type="submit" class="plan-button cart-checkout w-100 mt-3" id="fichaGenerar">GENERAR FICHA <i class="bi bi-upc-scan"></i></button>
+        </form>`;
+      ventanaFicha().show();
+      document.getElementById("fichaDatos").addEventListener("submit", async event => {
+        event.preventDefault();
+        const valor = id => document.getElementById(id).value.trim();
+        const datos = { nombre: valor("fichaNombre"), apellido: valor("fichaApellido"), correo: valor("fichaCorreo") };
+        const alerta = document.getElementById("fichaDatosAlerta");
+        if (!datos.nombre || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(datos.correo)) {
+          return showAlert(alerta, "danger", "Escribe tu nombre y un correo válido.");
+        }
+        const boton = document.getElementById("fichaGenerar");
+        boton.disabled = true;
+        boton.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span> GENERANDO TU FICHA...`;
+        const ok = await comprar("paynet", datos, null);
+        if (!ok) {
+          showAlert(alerta, "danger", escapeHtml(document.getElementById("checkout-alert").innerText || "No se pudo generar la ficha."));
+          boton.disabled = false;
+          boton.innerHTML = `GENERAR FICHA <i class="bi bi-upc-scan"></i>`;
+        }
+      });
+    }
+
+    const fechaLarga = valor => valor
+      ? new Date(valor).toLocaleString("es-MX", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" })
+      : "";
+    const referenciaLegible = ref => String(ref).replace(/(.{4})(?=.)/g, "$1 ");
+
+    // Paso 2: la ficha con código de barras y QR. Al abrirse se descarga sola como imagen PNG.
+    function mostrarFicha(pedido) {
+      document.getElementById("fichaTitulo").textContent = "Ficha de pago";
+      document.getElementById("fichaCuerpo").innerHTML = `
+        <div class="ficha">
+          <div class="ficha-monto"><span>TOTAL A PAGAR</span><strong>${dinero(pedido.total)} MXN</strong></div>
+          <div class="ficha-codigo"><svg id="fichaBarras" role="img" aria-label="Código de barras de la referencia"></svg></div>
+          <div class="ficha-referencia"><span>REFERENCIA</span><strong>${escapeHtml(referenciaLegible(pedido.referenciaPago))}</strong></div>
+          <div class="ficha-qr"><img id="fichaQr" alt="Código QR de la referencia"></div>
+          <dl class="ficha-datos">
+            <div><dt>Pedido</dt><dd>${escapeHtml(pedido.folio)}</dd></div>
+            <div><dt>Paga antes de</dt><dd>${escapeHtml(fechaLarga(pedido.vencePago))}</dd></div>
+          </dl>
+          <p class="ficha-texto">Presenta el código de barras o dicta la referencia en cualquier tienda participante
+            (7-Eleven, Walmart, Farmacias del Ahorro, entre otras) y paga en efectivo.</p>
+          <p class="ficha-texto ficha-descarga" id="fichaDescarga"><i class="bi bi-download me-1"></i> Descargando tu ficha…</p>
+          <div class="ficha-acciones">
+            <button type="button" class="plan-button cart-checkout" id="fichaDescargar">DESCARGAR FICHA <i class="bi bi-download"></i></button>
+            ${pedido.urlPago ? `<a class="plan-button" href="${escapeHtml(pedido.urlPago)}" target="_blank" rel="noopener">FICHA OFICIAL (PDF) <i class="bi bi-file-earmark-pdf"></i></a>` : ""}
+          </div>
+          ${String(pedido.metodoPago).endsWith("sandbox") ? `<p class="checkout-note mt-3"><i class="bi bi-info-circle me-1"></i> Ficha de prueba (sandbox de Paynet): no es válida para pagar en una tienda real.</p>` : ""}
+        </div>`;
+
+      JsBarcode("#fichaBarras", pedido.referenciaPago, { format: "CODE128", displayValue: false, height: 70, margin: 0, background: "#ffffff", lineColor: "#000000" });
+      const qr = qrcode(0, "M");
+      qr.addData(pedido.referenciaPago);
+      qr.make();
+      document.getElementById("fichaQr").src = qr.createDataURL(5, 2);
+
+      document.getElementById("fichaDescargar").addEventListener("click", () => descargarFicha(pedido));
+      const modal = document.getElementById("fichaModal");
+      const alAbrir = () => {
+        modal.removeEventListener("shown.bs.modal", alAbrir);
+        descargarFicha(pedido);
+      };
+      if (modal.classList.contains("show")) {
+        descargarFicha(pedido);
+      } else {
+        modal.addEventListener("shown.bs.modal", alAbrir);
+        ventanaFicha().show();
+      }
+    }
+
+    // Arma una imagen con la ficha completa (monto, código de barras, referencia, QR y vigencia) y la descarga
+    function descargarFicha(pedido) {
+      const ancho = 900, alto = 1180;
+      const lienzo = document.createElement("canvas");
+      lienzo.width = ancho;
+      lienzo.height = alto;
+      const c = lienzo.getContext("2d");
+      c.fillStyle = "#ffffff";
+      c.fillRect(0, 0, ancho, alto);
+      c.fillStyle = "#120c1e";
+      c.fillRect(0, 0, ancho, 150);
+      c.fillStyle = "#b9a7ff";
+      c.font = "bold 22px Arial";
+      c.fillText("FLUXGUARD / PAGO EN TIENDA", 50, 62);
+      c.fillStyle = "#ffffff";
+      c.font = "bold 40px Arial";
+      c.fillText("Ficha de pago", 50, 112);
+
+      c.fillStyle = "#555555";
+      c.font = "bold 20px Arial";
+      c.fillText("TOTAL A PAGAR", 50, 215);
+      c.fillStyle = "#000000";
+      c.font = "bold 58px Arial";
+      c.fillText(`${dinero(pedido.total)} MXN`, 50, 280);
+
+      const barras = document.createElement("canvas");
+      JsBarcode(barras, pedido.referenciaPago, { format: "CODE128", displayValue: false, height: 140, width: 3, margin: 0 });
+      const anchoBarras = Math.min(barras.width, ancho - 100);
+      c.drawImage(barras, (ancho - anchoBarras) / 2, 330, anchoBarras, 140);
+
+      c.textAlign = "center";
+      c.fillStyle = "#555555";
+      c.font = "bold 20px Arial";
+      c.fillText("REFERENCIA", ancho / 2, 515);
+      c.fillStyle = "#000000";
+      c.font = "bold 40px 'Courier New', monospace";
+      c.fillText(referenciaLegible(pedido.referenciaPago), ancho / 2, 565);
+
+      const qr = qrcode(0, "M");
+      qr.addData(pedido.referenciaPago);
+      qr.make();
+      const celdas = qr.getModuleCount();
+      const tam = 8;
+      const inicioX = (ancho - celdas * tam) / 2, inicioY = 610;
+      c.fillStyle = "#000000";
+      for (let f = 0; f < celdas; f++) {
+        for (let k = 0; k < celdas; k++) {
+          if (qr.isDark(f, k)) c.fillRect(inicioX + k * tam, inicioY + f * tam, tam, tam);
+        }
+      }
+
+      const baseTexto = inicioY + celdas * tam + 60;
+      c.fillStyle = "#333333";
+      c.font = "22px Arial";
+      c.fillText(`Pedido ${pedido.folio}  ·  Paga antes de: ${fechaLarga(pedido.vencePago)}`, ancho / 2, baseTexto);
+      c.font = "19px Arial";
+      c.fillText("Presenta este código en cualquier tienda participante y paga en efectivo.", ancho / 2, baseTexto + 40);
+      if (String(pedido.metodoPago).endsWith("sandbox")) {
+        c.fillStyle = "#b00020";
+        c.fillText("Ficha de prueba (sandbox): no válida para pagar en una tienda real.", ancho / 2, baseTexto + 75);
+      }
+
+      lienzo.toBlob(blob => {
+        const enlace = document.createElement("a");
+        enlace.href = URL.createObjectURL(blob);
+        enlace.download = `ficha-pago-${pedido.folio}.png`;
+        document.body.appendChild(enlace);
+        enlace.click();
+        enlace.remove();
+        setTimeout(() => URL.revokeObjectURL(enlace.href), 2000);
+        const aviso = document.getElementById("fichaDescarga");
+        if (aviso) aviso.innerHTML = `<i class="bi bi-check2-circle me-1"></i> Tu ficha se descargó como <strong>ficha-pago-${escapeHtml(pedido.folio)}.png</strong>.`;
+      }, "image/png");
+    }
+
+    async function abrirFichaGuardada(folio) {
+      try {
+        const response = await apiFetch(`/api/pedidos/${encodeURIComponent(folio)}`);
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data?.success) throw new Error(data?.message || "No encontramos ese pedido.");
+        if (!data.pedido.referenciaPago || data.pedido.estado !== "PENDIENTE") throw new Error("Ese pedido no tiene una ficha de pago pendiente.");
+        mostrarPedidoEnTienda(data.pedido);
+        mostrarFicha(data.pedido);
+      } catch (error) {
+        showAlert(document.getElementById("checkout-alert"), "danger", escapeHtml(error.message));
+        renderResumen(await cargarCarrito().catch(() => null));
+      }
+    }
+
+    // Lo que queda en la página detrás de la ventana: el pedido apartado y un botón para volver a ver la ficha
+    function mostrarPedidoEnTienda(pedido) {
+      document.getElementById("checkout-alert").classList.add("d-none");
+      document.getElementById("checkout-box").innerHTML = `
+        <div class="checkout-success">
+          <i class="bi bi-shop"></i>
+          <h2>Tu pedido está apartado</h2>
+          <p class="text-white-50 mb-2">Folio <strong class="text-white">${escapeHtml(pedido.folio)}</strong> · Total ${dinero(pedido.total)} · Pago en tienda</p>
+          <p class="text-white-50 mb-4">Paga en efectivo antes del <strong class="text-white">${escapeHtml(fechaLarga(pedido.vencePago))}</strong> con tu referencia
+            <strong class="text-white">${escapeHtml(referenciaLegible(pedido.referenciaPago))}</strong>.</p>
+          <button type="button" class="plan-button cart-checkout" id="verFicha">VER MI FICHA <i class="bi bi-upc-scan ms-2"></i></button>
+          <a href="tienda.html" class="plan-button">SEGUIR COMPRANDO <i class="bi bi-arrow-up-right ms-2"></i></a>
+        </div>`;
+      document.getElementById("verFicha").addEventListener("click", () => mostrarFicha(pedido));
     }
 
     function mostrarExito(pedido, usuario) {

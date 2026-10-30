@@ -1915,3 +1915,30 @@ select {
 .ticket-descarga-estado{margin:0 0 14px;color:#a39db0;font-size:12px}
 .ticket-descarga-estado .bi-check2-circle{color:#58e0a0}
 .ticket-descarga-estado .bi-exclamation-circle{color:#ffc56b}
+/* ===== Ventana flotante: ficha de pago en tienda ===== */
+.ficha-modal .modal-content{background:#0e0a17;color:#f5f2fc;border:1px solid rgba(185,167,255,.3);border-radius:4px}
+.ficha-modal .modal-header{align-items:flex-start;padding:22px 24px 14px;border-bottom:1px solid rgba(255,255,255,.08)}
+.ficha-modal .modal-title{margin:6px 0 0;font-family:"Barlow Condensed";font-size:38px;font-weight:900;line-height:.9;text-transform:uppercase}
+.ficha-modal .modal-body{padding:20px 24px 24px}
+.ficha-monto{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:16px}
+.ficha-monto span,.ficha-referencia span{color:#8d8897;font-size:9px;font-weight:900;letter-spacing:.14em}
+.ficha-monto strong{font-family:"Barlow Condensed";font-size:38px;line-height:1}
+.ficha-codigo{padding:16px;background:#fff;border-radius:3px;text-align:center}
+.ficha-codigo svg{width:100%;height:80px}
+.ficha-referencia{margin:14px 0 6px;text-align:center}
+.ficha-referencia strong{display:block;margin-top:4px;font-family:"Courier New",monospace;font-size:22px;letter-spacing:.06em}
+.ficha-qr{text-align:center;margin:10px 0 14px}
+.ficha-qr img{width:150px;height:150px;padding:8px;background:#fff;border-radius:3px;image-rendering:pixelated}
+.ficha-datos{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 12px}
+.ficha-datos div{padding:10px 12px;border:1px solid rgba(255,255,255,.08)}
+.ficha-datos dt{color:#8d8897;font-size:9px;font-weight:900;letter-spacing:.12em;text-transform:uppercase}
+.ficha-datos dd{margin:4px 0 0;font-size:13px}
+.ficha-texto{color:#a39db0;font-size:12px;line-height:1.6;margin:0 0 10px}
+.ficha-descarga{color:#cfc6ec}
+.ficha-acciones{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:6px}
+.ficha-acciones .plan-button{gap:8px;justify-content:center}
+.ficha-label{display:block;margin:12px 0 6px;color:#a8a2b5;font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase}
+.ficha-input{width:100%;padding:11px 13px;background:rgba(14,10,24,.9);border:1px solid rgba(185,167,255,.25);border-radius:4px;color:#fff;font-size:13px;outline:none}
+.ficha-input:focus{border-color:var(--gold)}
+@media(max-width:576px){.ficha-acciones,.ficha-datos{grid-template-columns:1fr}.ficha-modal .modal-title{font-size:32px}}
+a.flux-opinar-btn{display:inline-flex;align-items:center;gap:5px;text-decoration:none}

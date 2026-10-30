@@ -15,6 +15,7 @@ import com.fluxguard.service.PagoService.PagoNoDisponibleException;
 import com.fluxguard.service.PayPalService;
 import com.fluxguard.service.PayPalService.Captura;
 import com.fluxguard.service.PayPalService.Orden;
+import com.fluxguard.service.OpenpayService;
 import com.fluxguard.service.StripeService;
 import com.fluxguard.service.SuscripcionService;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,6 +35,7 @@ class PagoServiceTests {
     private PayPalService payPal;
     private StripeService stripe;
     private CorreoService correoService;
+    private OpenpayService openpay;
     private CarritoService carritoService;
     private PagoService pagoService;
     private Carrito carrito;
@@ -49,6 +51,7 @@ class PagoServiceTests {
         payPal = mock(PayPalService.class);
         stripe = mock(StripeService.class);
         correoService = mock(CorreoService.class);
+        openpay = mock(OpenpayService.class);
 
         usuario = new Usuario("Ana", "Lopez", "ana@fluxguard.io", "hash");
         usuario.setId("u1");
@@ -72,7 +75,8 @@ class PagoServiceTests {
         when(payPal.crearOrden(any())).thenReturn(new Orden("ORDEN123", "https://www.sandbox.paypal.com/checkoutnow?token=ORDEN123"));
 
         carritoService = new CarritoService(carritoRepository, pedidoRepository, new CatalogoService());
-        pagoService = new PagoService(carritoService, payPal, stripe, pedidoRepository, usuarioRepository, new SuscripcionService(), correoService);
+        pagoService = new PagoService(carritoService, payPal, stripe, openpay, pedidoRepository, usuarioRepository,
+                new SuscripcionService(), correoService);
     }
 
     private Pedido iniciarConKitYPlan() {
@@ -270,5 +274,61 @@ class PagoServiceTests {
         assertFalse(real.firmaValida("t=" + t + ",v1=" + firma, cuerpo + " ", t + 10)); // cuerpo alterado
         assertFalse(real.firmaValida("t=" + t + ",v1=" + firma, cuerpo, t + 1000));     // evento viejo
         assertFalse(real.firmaValida(null, cuerpo, t));
+    }
+
+    private void paynetConfigurado() {
+        when(openpay.estaConfigurado()).thenReturn(true);
+        when(openpay.esSandbox()).thenReturn(true);
+        when(openpay.crearFicha(any(), any(), any(), any())).thenReturn(new OpenpayService.Ficha(
+                "tr_123", "1010101234567890", "https://sandbox-api.openpay.mx/barcode/1010101234567890",
+                "https://sandbox-dashboard.openpay.mx/paynet-pdf/m1/1010101234567890", java.time.LocalDateTime.now().plusHours(72)));
+    }
+
+    @Test
+    void pagoEnTiendaGeneraFichaYVaciaElCarritoSinActivarNada() {
+        paynetConfigurado();
+        carritoService.agregar(comprador, "kit-piloto", 1);
+
+        PagoService.Inicio inicio = pagoService.iniciar(comprador, PagoService.PAYNET, null);
+
+        Pedido pedido = inicio.pedido();
+        assertNull(inicio.urlPago());
+        assertEquals(Pedido.PENDIENTE, pedido.getEstado());
+        assertEquals("paynet_sandbox", pedido.getMetodoPago());
+        assertEquals("1010101234567890", pedido.getReferenciaPago());
+        assertTrue(pedido.getUrlPago().endsWith("/paynet-pdf/m1/1010101234567890"));
+        assertNotNull(pedido.getVencePago());
+        // Con sesión se usan los datos de la cuenta
+        verify(openpay).crearFicha(any(), eq("Ana"), eq("Lopez"), eq("ana@fluxguard.io"));
+        assertTrue(carrito.getItems().isEmpty());
+        assertNull(usuario.getSuscripcion()); // aún no se paga: no se activa el dashboard
+        verify(payPal, never()).crearOrden(any());
+    }
+
+    @Test
+    void invitadoNecesitaNombreYCorreoParaLaFicha() {
+        paynetConfigurado();
+        Comprador invitado = Comprador.invitado("token-de-invitado-0123456789");
+        carritoService.agregar(invitado, "kit-piloto", 1);
+
+        assertThrows(PagoService.DatosClienteException.class,
+                () -> pagoService.iniciar(invitado, PagoService.PAYNET, null));
+        assertThrows(PagoService.DatosClienteException.class,
+                () -> pagoService.iniciar(invitado, PagoService.PAYNET, new PagoService.DatosCliente("Juan", "", "no-es-correo")));
+        verify(openpay, never()).crearFicha(any(), any(), any(), any());
+
+        Pedido pedido = pagoService.iniciar(invitado, PagoService.PAYNET,
+                new PagoService.DatosCliente(" Juan ", "Pérez", "Juan@Example.com")).pedido();
+        assertEquals("juan@example.com", pedido.getCorreoCliente());
+        assertEquals("Juan Pérez", pedido.getNombreCliente());
+    }
+
+    @Test
+    void sinOpenpayNoSeOfreceElPagoEnTienda() {
+        when(openpay.estaConfigurado()).thenReturn(false);
+        carritoService.agregar(comprador, "kit-piloto", 1);
+
+        assertFalse(pagoService.metodosDisponibles().contains(PagoService.PAYNET));
+        assertThrows(PagoService.PagoNoDisponibleException.class, () -> pagoService.iniciar(comprador, PagoService.PAYNET, null));
     }
 }
