@@ -1,5 +1,6 @@
 package com.fluxguard.controller;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fluxguard.dto.ApiResponse;
@@ -45,8 +46,10 @@ import java.util.regex.Pattern;
 public class PagoController {
 
     private static final Logger log = LoggerFactory.getLogger(PagoController.class);
-    // Orden de PayPal (p. ej. 5O190127TN364715T) o sesión de Stripe (cs_test_a1B2...)
+    // Orden de PayPal (p. ej. 5O190127TN364715T), sesión de Stripe (cs_test_a1B2...) o cargo de Openpay (trzjaozcik8msyqshka4)
     private static final Pattern REFERENCIA_PAGO = Pattern.compile("^[A-Za-z0-9_]{5,200}$");
+    // El webhook no viene firmado: lo que no parezca un código (p. ej. UY1qqrxw) no se escribe en el log
+    private static final Pattern CODIGO_VERIFICACION_OPENPAY = Pattern.compile("^[A-Za-z0-9]{4,64}$");
     private static final Set<String> EVENTOS_STRIPE = Set.of(
             "checkout.session.completed", "checkout.session.async_payment_succeeded", "checkout.session.expired");
 
@@ -210,6 +213,43 @@ public class PagoController {
         }
     }
 
+    /**
+     * Webhook de Openpay. Se da de alta en el panel de Openpay con la URL https://tu-dominio/api/pagos/openpay/webhook
+     * y el evento charge.succeeded (ver README). Openpay reintenta sin parar si no respondemos 200, así que todo lo
+     * que ya se resolvió responde 200, también lo que se ignora; solo se pide reintento si no se pudo verificar el cargo.
+     */
+    @PostMapping("/pagos/openpay/webhook")
+    public ResponseEntity<Void> webhookOpenpay(@RequestBody(required = false) String cuerpo) {
+        if (!pagoService.metodosDisponibles().contains(PagoService.PAYNET)) {
+            return ResponseEntity.notFound().build();
+        }
+        try {
+            JsonNode evento = json.readTree(cuerpo == null ? "" : cuerpo);
+            String tipo = evento.path("type").asText();
+            if ("verification".equals(tipo)) {
+                // Openpay manda el código a esta URL: se lee del log para escribirlo en "Verificar" en su panel
+                String codigo = evento.path("verification_code").asText();
+                if (CODIGO_VERIFICACION_OPENPAY.matcher(codigo).matches()) {
+                    log.info("[FluxG] Código de verificación del webhook de Openpay: {}", codigo);
+                }
+            } else if ("charge.succeeded".equals(tipo)) {
+                String cargoId = evento.path("transaction").path("id").asText();
+                if (REFERENCIA_PAGO.matcher(cargoId).matches()) {
+                    pagoService.confirmarDesdeOpenpay(cargoId);
+                } else {
+                    log.warn("[FluxG] Webhook de Openpay con un id de cargo inválido.");
+                }
+            }
+            return ResponseEntity.ok().build();
+        } catch (JsonProcessingException e) {
+            log.warn("[FluxG] Webhook de Openpay con un cuerpo que no es JSON.");
+            return ResponseEntity.ok().build();
+        } catch (RuntimeException e) {
+            log.error("[FluxG] No se pudo procesar el webhook de Openpay: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
+        }
+    }
+
     /** Busca el pedido del comprador (usuario o invitado), aplica la acción y responde con el pedido y el usuario actualizados. */
     private ResponseEntity<ApiResponse<UsuarioDto>> conPedido(String authorization, String invitado, String folio,
                                                               Function<Pedido, Pedido> accion) {
@@ -230,7 +270,7 @@ public class PagoController {
                 usuarioRepository.findById(comprador.get().clave()).map(UsuarioDto::de).ifPresent(response::setUsuario);
             }
             return ResponseEntity.ok(response);
-        } catch (PayPalException | StripeException e) {
+        } catch (PayPalException | StripeException | OpenpayException e) {
             return ResponseEntity.status(HttpStatus.BAD_GATEWAY)
                     .body(ApiResponse.error("No pudimos confirmar el pago. Recarga la página en unos momentos."));
         }

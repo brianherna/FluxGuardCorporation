@@ -1,5 +1,6 @@
 package com.fluxguard;
 
+import com.fluxguard.controller.PagoController;
 import com.fluxguard.model.Carrito;
 import com.fluxguard.model.Pedido;
 import com.fluxguard.model.Usuario;
@@ -17,6 +18,7 @@ import com.fluxguard.service.PayPalService;
 import com.fluxguard.service.PayPalService.Captura;
 import com.fluxguard.service.PayPalService.Orden;
 import com.fluxguard.service.OpenpayService;
+import com.fluxguard.service.SesionService;
 import com.fluxguard.service.StripeService;
 import com.fluxguard.service.SuscripcionService;
 import org.junit.jupiter.api.BeforeEach;
@@ -40,6 +42,8 @@ class PagoServiceTests {
     private NotificacionService notificacionService;
     private CarritoService carritoService;
     private PagoService pagoService;
+    private PedidoRepository pedidoRepository;
+    private UsuarioRepository usuarioRepository;
     private Carrito carrito;
     private Usuario usuario;
     private Comprador comprador;
@@ -48,8 +52,8 @@ class PagoServiceTests {
     @BeforeEach
     void setUp() {
         CarritoRepository carritoRepository = mock(CarritoRepository.class);
-        PedidoRepository pedidoRepository = mock(PedidoRepository.class);
-        UsuarioRepository usuarioRepository = mock(UsuarioRepository.class);
+        pedidoRepository = mock(PedidoRepository.class);
+        usuarioRepository = mock(UsuarioRepository.class);
         payPal = mock(PayPalService.class);
         stripe = mock(StripeService.class);
         correoService = mock(CorreoService.class);
@@ -69,6 +73,8 @@ class PagoServiceTests {
             return p;
         });
         when(pedidoRepository.findByUsuarioIdOrderByFechaDesc("u1")).thenAnswer(inv -> List.copyOf(pedidos.values()));
+        when(pedidoRepository.findByFolio(anyString())).thenAnswer(inv -> pedidos.values().stream()
+                .filter(p -> p.getFolio().equals(inv.getArgument(0))).findFirst());
         when(usuarioRepository.findById("u1")).thenReturn(Optional.of(usuario));
         when(usuarioRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
 
@@ -314,5 +320,197 @@ class PagoServiceTests {
         assertTrue(pedidos.isEmpty());
         verify(payPal, never()).crearOrden(any());
         verify(openpay, never()).crearFicha(any(), any(), any(), any());
+    }
+
+    private Pedido iniciarConPaynet() {
+        paynetConfigurado();
+        carritoService.agregar(comprador, "kit-piloto", 1);
+        carritoService.agregar(comprador, "plan-standard", 1);
+        return pagoService.iniciar(comprador, PagoService.PAYNET, "pc").pedido();
+    }
+
+    private OpenpayService.Cargo cargo(Pedido pedido, String estado, String monto) {
+        return new OpenpayService.Cargo("tr_123", estado, new BigDecimal(monto), "MXN", pedido.getFolio());
+    }
+
+    private PagoController controlador() {
+        return new PagoController(pagoService, stripe, pedidoRepository, usuarioRepository, mock(SesionService.class));
+    }
+
+    private static final String EVENTO_PAGADO = """
+            {"type":"charge.succeeded","event_date":"2026-11-03T10:00:00-06:00",
+             "transaction":{"id":"tr_123","status":"completed","amount":1.0,"method":"store","order_id":"FALSO"}}""";
+
+    @Test
+    void cargoPagadoEnTiendaMarcaPagadoConLosDatosDeOpenpay() {
+        Pedido pedido = iniciarConPaynet();
+        when(openpay.obtenerCargo("tr_123")).thenReturn(Optional.of(cargo(pedido, "completed", "849.00")));
+
+        // El monto y el order_id del cuerpo son falsos a propósito: solo cuenta lo que responde Openpay
+        assertEquals(200, controlador().webhookOpenpay(EVENTO_PAGADO).getStatusCode().value());
+
+        assertEquals(Pedido.PAGADO, pedido.getEstado());
+        assertEquals("tr_123", pedido.getPagoId());
+        assertNotNull(pedido.getPagadoEn());
+        assertEquals("standard", usuario.getSuscripcion().getTipo());
+        verify(correoService, times(1)).enviarTicket(pedido);
+        verify(notificacionService, times(1)).avisarCompra(pedido);
+        verify(payPal, never()).capturar(any());
+    }
+
+    @Test
+    void cargoDeOpenpayConMontoOMonedaDistintaNoSeMarcaPagado() {
+        Pedido pedido = iniciarConPaynet();
+        when(openpay.obtenerCargo("tr_123")).thenReturn(Optional.of(cargo(pedido, "completed", "1.00")));
+        assertEquals(200, controlador().webhookOpenpay(EVENTO_PAGADO).getStatusCode().value());
+        assertEquals(Pedido.PENDIENTE, pedido.getEstado());
+
+        when(openpay.obtenerCargo("tr_123")).thenReturn(Optional.of(
+                new OpenpayService.Cargo("tr_123", "completed", new BigDecimal("849.00"), "USD", pedido.getFolio())));
+        assertEquals(200, controlador().webhookOpenpay(EVENTO_PAGADO).getStatusCode().value());
+
+        assertEquals(Pedido.PENDIENTE, pedido.getEstado());
+        assertNull(pedido.getPagoId());
+        assertNull(usuario.getSuscripcion());
+        verify(correoService, never()).enviarTicket(any());
+        verify(notificacionService, never()).avisarCompra(any());
+    }
+
+    @Test
+    void eventoDeOpenpayRepetidoNoProcesaDosVeces() {
+        Pedido pedido = iniciarConPaynet();
+        when(openpay.obtenerCargo("tr_123")).thenReturn(Optional.of(cargo(pedido, "completed", "849.00")));
+
+        assertEquals(200, controlador().webhookOpenpay(EVENTO_PAGADO).getStatusCode().value());
+        assertEquals(200, controlador().webhookOpenpay(EVENTO_PAGADO).getStatusCode().value());
+
+        assertEquals(Pedido.PAGADO, pedido.getEstado());
+        verify(correoService, times(1)).enviarTicket(pedido);
+        verify(notificacionService, times(1)).avisarCompra(pedido);
+    }
+
+    @Test
+    void eventoDeOpenpayEntregadoDosVecesALaVezNoProcesaDosVeces() throws Exception {
+        Pedido pedido = iniciarConPaynet();
+        when(openpay.obtenerCargo("tr_123")).thenReturn(Optional.of(cargo(pedido, "completed", "849.00")));
+        // Cada lectura da una copia, como Mongo. Si las dos entregas pudieran leer a la vez, ambas verían PENDIENTE
+        java.util.concurrent.CountDownLatch ambas = new java.util.concurrent.CountDownLatch(2);
+        when(pedidoRepository.findByFolio(pedido.getFolio())).thenAnswer(inv -> {
+            Pedido guardado = pedidos.get(pedido.getId());
+            Pedido copia = new Pedido(guardado.getFolio(), guardado.getUsuarioId(), guardado.getLineas(), guardado.getTotal(),
+                    guardado.getEstado(), guardado.getFecha());
+            copia.setId(guardado.getId());
+            copia.setOrdenId(guardado.getOrdenId());
+            copia.setCorreoCliente(guardado.getCorreoCliente());
+            ambas.countDown();
+            ambas.await(300, java.util.concurrent.TimeUnit.MILLISECONDS);
+            return Optional.of(copia);
+        });
+
+        Thread otra = new Thread(() -> pagoService.confirmarDesdeOpenpay("tr_123"));
+        otra.start();
+        pagoService.confirmarDesdeOpenpay("tr_123");
+        otra.join();
+
+        verify(correoService, times(1)).enviarTicket(any());
+        verify(notificacionService, times(1)).avisarCompra(any());
+    }
+
+    @Test
+    void cargoDeUnPedidoInexistenteSeIgnora() {
+        iniciarConPaynet();
+        when(openpay.obtenerCargo("tr_123")).thenReturn(Optional.of(
+                new OpenpayService.Cargo("tr_123", "completed", new BigDecimal("849.00"), "MXN", "FG-NO-EXISTE")));
+        assertEquals(200, controlador().webhookOpenpay(EVENTO_PAGADO).getStatusCode().value());
+
+        // Un cargo que Openpay no conoce (evento inventado) tampoco se reintenta
+        when(openpay.obtenerCargo("tr_123")).thenReturn(Optional.empty());
+        assertEquals(200, controlador().webhookOpenpay(EVENTO_PAGADO).getStatusCode().value());
+
+        assertTrue(pedidos.values().stream().allMatch(p -> Pedido.PENDIENTE.equals(p.getEstado())));
+        verify(correoService, never()).enviarTicket(any());
+    }
+
+    @Test
+    void cargoDeOtroPedidoOSinPagarNoMarcaPagado() {
+        Pedido pedido = iniciarConPaynet();
+        when(openpay.obtenerCargo("tr_123")).thenReturn(Optional.of(
+                new OpenpayService.Cargo("tr_otro", "completed", new BigDecimal("849.00"), "MXN", pedido.getFolio())));
+        pagoService.confirmarDesdeOpenpay("tr_123");
+        assertEquals(Pedido.PENDIENTE, pedido.getEstado());
+
+        when(openpay.obtenerCargo("tr_123")).thenReturn(Optional.of(cargo(pedido, "in_progress", "849.00")));
+        pagoService.confirmarDesdeOpenpay("tr_123");
+        assertEquals(Pedido.PENDIENTE, pedido.getEstado());
+    }
+
+    @Test
+    void pedidoCanceladoPagadoEnTiendaNoSeReactiva() {
+        Pedido pedido = iniciarConPaynet();
+        pagoService.cancelar(pedido);
+        when(openpay.obtenerCargo("tr_123")).thenReturn(Optional.of(cargo(pedido, "completed", "849.00")));
+
+        assertEquals(200, controlador().webhookOpenpay(EVENTO_PAGADO).getStatusCode().value());
+
+        assertEquals(Pedido.CANCELADO, pedido.getEstado());
+        verify(correoService, never()).enviarTicket(any());
+    }
+
+    @Test
+    void siOpenpayNoRespondeSePideReintentoYElPedidoSigueSinPagar() {
+        Pedido pedido = iniciarConPaynet();
+        when(openpay.obtenerCargo("tr_123")).thenThrow(new OpenpayService.OpenpayException("sin conexión", null));
+
+        assertEquals(503, controlador().webhookOpenpay(EVENTO_PAGADO).getStatusCode().value());
+
+        assertEquals(Pedido.PENDIENTE, pedido.getEstado());
+    }
+
+    @Test
+    void confirmarUnPedidoPaynetConsultaOpenpayYNuncaCapturaEnPayPal() {
+        Pedido pedido = iniciarConPaynet();
+        when(openpay.obtenerCargo("tr_123")).thenReturn(Optional.of(cargo(pedido, "in_progress", "849.00")));
+
+        pagoService.confirmar(pedido, "tr_123");
+        assertEquals(Pedido.PENDIENTE, pedido.getEstado());
+
+        when(openpay.obtenerCargo("tr_123")).thenReturn(Optional.of(cargo(pedido, "completed", "849.00")));
+        pagoService.confirmar(pedido, "tr_123");
+
+        assertEquals(Pedido.PAGADO, pedido.getEstado());
+        verify(payPal, never()).capturar(any());
+    }
+
+    @Test
+    void verificacionDelWebhookDeOpenpayRespondeOkYNoConsultaCargos() {
+        paynetConfigurado();
+
+        assertEquals(200, controlador().webhookOpenpay(
+                "{\"type\":\"verification\",\"event_date\":\"2026-11-03T10:00:00-06:00\",\"verification_code\":\"UY1qqrxw\"}")
+                .getStatusCode().value());
+        assertEquals(200, controlador().webhookOpenpay("{\"type\":\"charge.refunded\",\"transaction\":{\"id\":\"tr_123\"}}").getStatusCode().value());
+        assertEquals(200, controlador().webhookOpenpay("no es json").getStatusCode().value());
+        assertEquals(200, controlador().webhookOpenpay(null).getStatusCode().value());
+
+        verify(openpay, never()).obtenerCargo(any());
+    }
+
+    @Test
+    void sinOpenpayConfiguradoElWebhookNoExiste() {
+        when(openpay.estaConfigurado()).thenReturn(false);
+
+        assertEquals(404, controlador().webhookOpenpay(EVENTO_PAGADO).getStatusCode().value());
+    }
+
+    @Test
+    void leeElCargoConElFormatoDeOpenpay() throws Exception {
+        OpenpayService.Cargo leido = OpenpayService.Cargo.de(new com.fasterxml.jackson.databind.ObjectMapper().readTree("""
+                {"id":"trzjaozcik8msyqshka4","amount":849.00,"status":"completed","currency":"MXN","order_id":"FG-1","method":"store"}"""));
+
+        assertEquals("trzjaozcik8msyqshka4", leido.id());
+        assertEquals("completed", leido.estado());
+        assertEquals(0, new BigDecimal("849").compareTo(leido.monto()));
+        assertEquals("MXN", leido.moneda());
+        assertEquals("FG-1", leido.folio());
     }
 }

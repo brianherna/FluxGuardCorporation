@@ -5,6 +5,7 @@ import com.fluxguard.model.Pedido;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
@@ -19,12 +20,14 @@ import java.time.format.DateTimeFormatter;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Pago en tienda con Paynet a través de Openpay (cargo con method "store"):
  * https://documents.openpay.mx/docs/store-charge.html
  * Openpay devuelve una referencia, la imagen del código de barras y una ficha en PDF; el cliente paga en
  * efectivo en tiendas participantes (7-Eleven, Walmart, farmacias...). Por defecto usa el sandbox (pruebas).
+ * El pago se confirma con el webhook charge.succeeded, que consulta el cargo aquí (obtenerCargo).
  * Lee OPENPAY_MERCHANT_ID, OPENPAY_PRIVATE_KEY y OPENPAY_PRODUCTION (false) del .env o de variables de entorno.
  */
 @Service
@@ -36,6 +39,15 @@ public class OpenpayService {
 
     /** Ficha de pago generada por Paynet. */
     public record Ficha(String cargoId, String referencia, String codigoBarrasUrl, String urlPdf, LocalDateTime vence) {}
+
+    /** Cargo tal como lo reporta Openpay. estado es "completed" cuando ya se pagó; folio es el order_id con el que se creó. */
+    public record Cargo(String id, String estado, BigDecimal monto, String moneda, String folio) {
+        public static Cargo de(JsonNode r) {
+            return new Cargo(r.path("id").asText(null), r.path("status").asText(null),
+                    r.hasNonNull("amount") ? r.get("amount").decimalValue() : null,
+                    r.path("currency").asText(null), r.path("order_id").asText(null));
+        }
+    }
 
     /** Openpay no respondió o rechazó la operación. */
     public static class OpenpayException extends RuntimeException {
@@ -118,6 +130,29 @@ public class OpenpayService {
             log.error("[FluxG] Openpay rechazó la ficha del pedido {} ({}): {}",
                     pedido.getFolio(), e.getStatusCode(), e.getResponseBodyAsString());
             throw new OpenpayException("Openpay rechazó la solicitud de la ficha.", e);
+        } catch (RestClientException e) {
+            log.error("[FluxG] No se pudo conectar con Openpay: {}", e.getMessage());
+            throw new OpenpayException("No se pudo conectar con Openpay.", e);
+        }
+    }
+
+    /** Consulta un cargo del comercio. Vacío si Openpay no lo conoce; si no responde lanza OpenpayException. */
+    public Optional<Cargo> obtenerCargo(String cargoId) {
+        try {
+            JsonNode r = restClient.get()
+                    .uri("/charges/{id}", cargoId)
+                    .retrieve()
+                    .body(JsonNode.class);
+            if (r == null) {
+                throw new OpenpayException("Openpay no devolvió el cargo.", null);
+            }
+            return Optional.of(Cargo.de(r));
+        } catch (RestClientResponseException e) {
+            if (e.getStatusCode().isSameCodeAs(HttpStatus.NOT_FOUND)) {
+                return Optional.empty();
+            }
+            log.error("[FluxG] Openpay rechazó la consulta del cargo {} ({}): {}", cargoId, e.getStatusCode(), e.getResponseBodyAsString());
+            throw new OpenpayException("Openpay rechazó la consulta del cargo.", e);
         } catch (RestClientException e) {
             log.error("[FluxG] No se pudo conectar con Openpay: {}", e.getMessage());
             throw new OpenpayException("No se pudo conectar con Openpay.", e);

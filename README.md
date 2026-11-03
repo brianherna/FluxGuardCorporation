@@ -60,6 +60,7 @@ docker build -t fluxguard . && docker run --env-file .env -p 8080:8080 fluxguard
 | GET | `/api/pedidos/{folio}` | Estado de un pedido del usuario |
 | POST | `/api/pedidos/{folio}/confirmar?token=` | Confirma el pago (orden de PayPal o sesión de Stripe); si se completa activa el plan y vacía el carrito |
 | POST | `/api/pagos/stripe/webhook` | Aviso de Stripe (`checkout.session.completed`), verificado con `STRIPE_WEBHOOK_SECRET` |
+| POST | `/api/pagos/openpay/webhook` | Aviso de Openpay (`charge.succeeded`), verificado consultando el cargo a Openpay |
 | POST | `/api/pedidos/{folio}/cancelar` | Marca el pedido como cancelado (el carrito se conserva) |
 | POST | `/api/prospectos` | Guarda el formulario de contacto con un folio (`SOL-12345`), envía confirmación al cliente y aviso al equipo. Límite: 1 por correo cada 10 min y 5 por IP por hora |
 | GET | `/api/prospectos` | Lista prospectos (requiere `X-Admin-Key`) |
@@ -96,7 +97,18 @@ El cobro se confirma cuando el cliente regresa a la página, así que funciona e
 2. Copia el **ID de comercio** a `OPENPAY_MERCHANT_ID` y la **llave privada** (`sk_...`) a `OPENPAY_PRIVATE_KEY`.
 3. En el carrito aparece **Pagar en tienda**. Un invitado escribe su nombre y correo; con sesión se usan los de la cuenta.
 4. Se abre una ventana con la ficha (código de barras, QR, referencia, monto y fecha límite) y se descarga sola como PNG.
-   El pedido queda **PENDIENTE** con su referencia y el carrito se vacía. Por ahora no se confirma el pago en tienda.
+   El pedido queda **PENDIENTE** con su referencia y el carrito se vacía hasta que Openpay avisa que se pagó.
+
+#### Registrar el webhook en Openpay
+
+Sin este webhook los pedidos pagados en tienda se quedan en **PENDIENTE**. Se registra una vez por ambiente (sandbox y producción), con `OPENPAY_MERCHANT_ID` y `OPENPAY_PRIVATE_KEY` ya puestas en Render: sin ellas la ruta responde 404 y Openpay no puede entregar el código.
+
+1. En el panel de Openpay entra a tu perfil de comercio y, en **Webhooks**, elige **+Agregar Webhook**.
+2. Pon la URL `https://fluxguardcorporation.com/api/pagos/openpay/webhook` (solo acepta dominio con HTTPS, no IPs), deja sin autenticación HTTP y, si el panel pide elegir eventos, marca `charge.succeeded`. Guarda.
+3. Openpay manda el código en un POST de tipo `verification` a esa URL. Búscalo en los logs de Render, en la línea `Código de verificación del webhook de Openpay: ...`.
+4. En el panel elige **Verificar** y escribe ese código. Si se perdió, **Reenviar Código** genera uno nuevo. Las notificaciones empiezan a llegar a partir de ese momento: Openpay no reenvía pagos anteriores.
+
+Al llegar `charge.succeeded` no se confía en el cuerpo: se toma el id del cargo, se consulta a Openpay y solo si está `completed`, es el cargo del pedido y el monto en MXN coincide, el pedido pasa a **PAGADO** (plan, ticket y aviso, igual que PayPal y Stripe). El webhook responde 200 aunque ignore el evento (repetido, monto distinto, pedido inexistente); estos casos quedan en el log. Solo responde 503 si no pudo consultar a Openpay, para que reintente y el pago no se pierda.
 
 ### Carrito sin cuenta, compra con cuenta
 

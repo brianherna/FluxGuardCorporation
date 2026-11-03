@@ -4,6 +4,7 @@ import com.fluxguard.model.Pedido;
 import com.fluxguard.model.Usuario;
 import com.fluxguard.repository.PedidoRepository;
 import com.fluxguard.repository.UsuarioRepository;
+import com.fluxguard.service.OpenpayService.Cargo;
 import com.fluxguard.service.PayPalService.Captura;
 import com.fluxguard.service.PayPalService.Orden;
 import com.fluxguard.service.StripeService.Sesion;
@@ -16,6 +17,7 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Flujo de pago (PayPal o tarjeta con Stripe):
@@ -25,6 +27,8 @@ import java.util.List;
  *    - Stripe: el cobro ya ocurrió en su página; se consulta la sesión. El webhook de Stripe hace lo mismo
  *      por si el cliente cierra la ventana antes de regresar.
  *    Si el pago está completo y el monto coincide, el pedido pasa a PAGADO, se activa el plan y se vacía el carrito.
+ * En tienda (Paynet) el cliente no regresa: iniciar() entrega la ficha y el webhook de Openpay confirma el pago
+ * consultando el cargo (confirmarDesdeOpenpay).
  */
 @Service
 public class PagoService {
@@ -51,6 +55,7 @@ public class PagoService {
     public static final String PAYPAL = "paypal";
     public static final String STRIPE = "stripe";
     public static final String PAYNET = "paynet";
+    private static final String CARGO_COMPLETADO = "completed";
 
     private final PayPalService payPal;
     private final StripeService stripe;
@@ -153,7 +158,7 @@ public class PagoService {
      * Comprueba el pago del pedido con su proveedor. Es idempotente: recargar la página o recibir
      * el mismo webhook varias veces no cobra ni activa nada dos veces.
      *
-     * @param referencia el "token" con el que regresa el cliente (orden de PayPal o sesión de Stripe); debe ser la de este pedido
+     * @param referencia el "token" con el que regresa el cliente (orden de PayPal, sesión de Stripe o cargo de Openpay); debe ser la de este pedido
      */
     public Pedido confirmar(Pedido pedido, String referencia) {
         if (!Pedido.PENDIENTE.equals(pedido.getEstado()) || referencia == null || !referencia.equals(pedido.getOrdenId())) {
@@ -161,6 +166,10 @@ public class PagoService {
         }
         if (pedido.getMetodoPago() != null && pedido.getMetodoPago().startsWith(STRIPE)) {
             return confirmarStripe(pedido, referencia);
+        }
+        if (pedido.getMetodoPago() != null && pedido.getMetodoPago().startsWith(PAYNET)) {
+            // Una ficha no se captura: solo se consulta si ya se pagó en tienda
+            return openpay.obtenerCargo(referencia).flatMap(this::registrarCargo).orElse(pedido);
         }
         String ordenId = referencia;
 
@@ -203,6 +212,57 @@ public class PagoService {
         pedidoRepository.findById(pedidoId).ifPresentOrElse(
                 pedido -> confirmar(pedido, sesionId),
                 () -> log.warn("[FluxG] Webhook de Stripe para un pedido que no existe ({}).", pedidoId));
+    }
+
+    /**
+     * Webhook de Openpay (charge.succeeded): confirma el pedido pagado en tienda. Del evento solo se usa el id del cargo;
+     * estado, monto y pedido salen de consultar ese cargo a Openpay, porque el webhook no viene firmado.
+     */
+    public void confirmarDesdeOpenpay(String cargoId) {
+        if (cargoId == null) {
+            return;
+        }
+        openpay.obtenerCargo(cargoId).ifPresentOrElse(
+                this::registrarCargo,
+                () -> log.warn("[FluxG] Webhook de Openpay para un cargo que Openpay no conoce ({}).", cargoId));
+    }
+
+    /**
+     * Aplica al pedido un cargo ya consultado a Openpay y devuelve el pedido, si existe.
+     * Openpay puede entregar el mismo evento dos veces a la vez: es synchronized y relee el pedido
+     * para que solo una entrega lo vea PENDIENTE y envíe el ticket y el aviso.
+     */
+    private synchronized Optional<Pedido> registrarCargo(Cargo cargo) {
+        Optional<Pedido> encontrado = cargo.folio() == null ? Optional.empty() : pedidoRepository.findByFolio(cargo.folio());
+        if (encontrado.isEmpty()) {
+            log.warn("[FluxG] El cargo de Openpay {} es de un pedido que no existe ({}).", cargo.id(), cargo.folio());
+            return encontrado;
+        }
+        Pedido pedido = encontrado.get();
+        if (pedido.getOrdenId() == null || !pedido.getOrdenId().equals(cargo.id())) {
+            log.error("[FluxG] El cargo de Openpay {} no pertenece al pedido {}.", cargo.id(), pedido.getFolio());
+            return encontrado;
+        }
+        if (!CARGO_COMPLETADO.equals(cargo.estado())) {
+            // "in_progress": la ficha sigue sin pagarse; el pedido sigue pendiente
+            log.info("[FluxG] Pedido {}: cargo Openpay {} en estado {}.", pedido.getFolio(), cargo.id(), cargo.estado());
+            return encontrado;
+        }
+        if (!Pedido.PENDIENTE.equals(pedido.getEstado())) {
+            if (!pedido.estaPagado()) {
+                log.error("[FluxG] El cliente pagó en tienda el pedido {}, que está {}. Hay que revisarlo a mano.", pedido.getFolio(), pedido.getEstado());
+            }
+            return encontrado;
+        }
+        if (!montoCoincide(pedido, cargo)) {
+            log.error("[FluxG] El cargo de Openpay {} no coincide con el pedido {}: {} {} contra {} MXN. No se marca como pagado.",
+                    cargo.id(), pedido.getFolio(), cargo.monto(), cargo.moneda(), pedido.getTotal());
+            return encontrado;
+        }
+        pedido.setPagoId(cargo.id());
+        completar(pedido);
+        log.info("[FluxG] Pedido {}: cargo Openpay {} -> {}", pedido.getFolio(), cargo.id(), pedido.getEstado());
+        return encontrado;
     }
 
     private Pedido confirmarStripe(Pedido pedido, String sesionId) {
@@ -291,5 +351,11 @@ public class PagoService {
         return captura.monto() != null
                 && payPal.getMoneda().equals(captura.moneda())
                 && captura.monto().compareTo(BigDecimal.valueOf(pedido.getTotal())) == 0;
+    }
+
+    private boolean montoCoincide(Pedido pedido, Cargo cargo) {
+        return cargo.monto() != null
+                && "MXN".equalsIgnoreCase(cargo.moneda())
+                && cargo.monto().compareTo(BigDecimal.valueOf(pedido.getTotal())) == 0;
     }
 }
