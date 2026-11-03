@@ -1,6 +1,7 @@
 package com.fluxguard.dto;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fluxguard.model.Notificacion;
 import com.fluxguard.model.Pedido;
 import com.fluxguard.model.Producto;
 
@@ -24,6 +25,8 @@ public class ApiResponse<T> {
     private List<Producto> productos;
     private String urlPago;
     private List<String> metodosPago;
+    private List<Notificacion> notificaciones;
+    private Long noLeidas;
 
     public ApiResponse() {}
 
@@ -166,5 +169,21 @@ public class ApiResponse<T> {
 
     public void setResenas(List<ResenaDto> resenas) {
         this.resenas = resenas;
+    }
+
+    public List<Notificacion> getNotificaciones() {
+        return notificaciones;
+    }
+
+    public void setNotificaciones(List<Notificacion> notificaciones) {
+        this.notificaciones = notificaciones;
+    }
+
+    public Long getNoLeidas() {
+        return noLeidas;
+    }
+
+    public void setNoLeidas(Long noLeidas) {
+        this.noLeidas = noLeidas;
     }
 }

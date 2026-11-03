@@ -1946,3 +1946,12 @@ a.flux-opinar-btn{display:inline-flex;align-items:center;gap:5px;text-decoration
 .review-summary strong{font-family:"Barlow Condensed";font-size:42px;line-height:1}
 .review-summary span{color:#a39db0;font-size:12px}
 .review-sin-comentario{color:#8d8897;font-style:italic}
+
+/* Aviso de compra en la cuenta (main.js: mostrarAvisoCompra) */
+.aviso-compra{position:fixed;top:92px;right:20px;z-index:2000;display:grid;grid-template-columns:auto 1fr;gap:6px 14px;width:min(380px,calc(100vw - 32px));padding:18px;background:var(--panel);border:1px solid var(--gold);border-radius:8px;box-shadow:0 18px 50px rgba(0,0,0,.5);color:#fff}
+.aviso-compra>i{font-size:26px;color:var(--gold)}
+.aviso-compra strong{display:block;font-size:16px}
+.aviso-compra p{margin:4px 0 0;font-size:14px;line-height:1.45;color:var(--muted)}
+.aviso-compra-ok{grid-column:2;justify-self:start;margin-top:8px;padding:8px 14px;background:var(--gold);border:0;border-radius:4px;color:var(--ink);font-size:12px;font-weight:700;letter-spacing:.08em;cursor:pointer}
+.aviso-compra-ok:hover{background:var(--gold-2)}
+@media(max-width:700px){.aviso-compra{top:80px;right:16px}}

@@ -10,6 +10,7 @@ import com.fluxguard.repository.PedidoRepository;
 import com.fluxguard.repository.UsuarioRepository;
 import com.fluxguard.service.CarritoService.CarritoException;
 import com.fluxguard.service.Comprador;
+import com.fluxguard.service.NotificacionService;
 import com.fluxguard.service.PagoService;
 import com.fluxguard.service.OpenpayService.OpenpayException;
 import com.fluxguard.service.PagoService.SesionRequeridaException;
@@ -81,6 +82,7 @@ public class PagoController {
     @PostMapping("/carrito/comprar")
     public ResponseEntity<ApiResponse<UsuarioDto>> comprar(@RequestHeader(value = "Authorization", required = false) String authorization,
                                                           @RequestHeader(value = CarritoController.INVITADO, required = false) String invitado,
+                                                          @RequestHeader(value = HttpHeaders.USER_AGENT, required = false) String userAgent,
                                                           @RequestParam(value = "metodo", defaultValue = PagoService.PAYPAL) String metodo) {
         Optional<Comprador> comprador = sesionService.compradorDesde(authorization, invitado);
         if (comprador.isEmpty()) {
@@ -88,7 +90,7 @@ public class PagoController {
         }
         String proveedor = PagoService.STRIPE.equals(metodo) ? "Stripe" : PagoService.PAYNET.equals(metodo) ? "Paynet" : "PayPal";
         try {
-            PagoService.Inicio inicio = pagoService.iniciar(comprador.get(), metodo);
+            PagoService.Inicio inicio = pagoService.iniciar(comprador.get(), metodo, NotificacionService.origenDesde(userAgent));
             boolean ficha = inicio.pedido().getReferenciaPago() != null;
             ApiResponse<UsuarioDto> response = ApiResponse.ok(ficha
                     ? "Tu ficha de pago del pedido " + inicio.pedido().getFolio() + " está lista. Págala en cualquier tienda participante."

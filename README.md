@@ -25,6 +25,7 @@ Plataforma web de monitoreo eléctrico IoT. Backend en Spring Boot 3.5 (Java 17)
 | `PAYPAL_CURRENCY` | Moneda de cobro, por defecto `MXN` |
 | `STRIPE_SECRET_KEY` | Llave secreta de Stripe (`sk_test_...` = modo de prueba). Vacía = no aparece el pago con tarjeta |
 | `STRIPE_WEBHOOK_SECRET` | Secreto del webhook de Stripe (`whsec_...`), para confirmar pagos aunque el cliente no regrese a la página |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Cuenta de servicio de Firebase en una sola línea, para el push a la app móvil. Vacía = sin push; los avisos se ven al abrir la app o la web |
 
 En Render, define las mismas variables en el panel del servicio.
 
@@ -62,6 +63,10 @@ docker build -t fluxguard . && docker run --env-file .env -p 8080:8080 fluxguard
 | POST | `/api/pedidos/{folio}/cancelar` | Marca el pedido como cancelado (el carrito se conserva) |
 | POST | `/api/prospectos` | Guarda el formulario de contacto con un folio (`SOL-12345`), envía confirmación al cliente y aviso al equipo. Límite: 1 por correo cada 10 min y 5 por IP por hora |
 | GET | `/api/prospectos` | Lista prospectos (requiere `X-Admin-Key`) |
+| GET | `/api/notificaciones` | Avisos de la cuenta (p. ej. "Alguien compró en tu cuenta") y cuántos faltan por leer |
+| POST | `/api/notificaciones/leidas` | Marca todos los avisos como leídos |
+| POST | `/api/notificaciones/dispositivos` | Registra el celular que recibe push (`token`, `plataforma`: `android` o `ios`) |
+| POST | `/api/notificaciones/dispositivos/quitar` | Deja de enviar push a ese celular (la app lo llama al cerrar sesión) |
 | GET | `/api/health` | Estado del servicio |
 
 ## Pagos con PayPal Sandbox (modo de prueba)

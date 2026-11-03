@@ -10,6 +10,7 @@ import com.fluxguard.service.CarritoService;
 import com.fluxguard.service.CatalogoService;
 import com.fluxguard.service.Comprador;
 import com.fluxguard.service.CorreoService;
+import com.fluxguard.service.NotificacionService;
 import com.fluxguard.service.PagoService;
 import com.fluxguard.service.PagoService.PagoNoDisponibleException;
 import com.fluxguard.service.PayPalService;
@@ -36,6 +37,7 @@ class PagoServiceTests {
     private StripeService stripe;
     private CorreoService correoService;
     private OpenpayService openpay;
+    private NotificacionService notificacionService;
     private CarritoService carritoService;
     private PagoService pagoService;
     private Carrito carrito;
@@ -52,6 +54,7 @@ class PagoServiceTests {
         stripe = mock(StripeService.class);
         correoService = mock(CorreoService.class);
         openpay = mock(OpenpayService.class);
+        notificacionService = mock(NotificacionService.class);
 
         usuario = new Usuario("Ana", "Lopez", "ana@fluxguard.io", "hash");
         usuario.setId("u1");
@@ -76,13 +79,13 @@ class PagoServiceTests {
 
         carritoService = new CarritoService(carritoRepository, pedidoRepository, new CatalogoService());
         pagoService = new PagoService(carritoService, payPal, stripe, openpay, pedidoRepository, usuarioRepository,
-                new SuscripcionService(), correoService);
+                new SuscripcionService(), correoService, notificacionService);
     }
 
     private Pedido iniciarConKitYPlan() {
         carritoService.agregar(comprador, "kit-piloto", 1);
         carritoService.agregar(comprador, "plan-standard", 1);
-        PagoService.Inicio inicio = pagoService.iniciar(comprador, PagoService.PAYPAL);
+        PagoService.Inicio inicio = pagoService.iniciar(comprador, PagoService.PAYPAL, "pc");
         assertEquals("https://www.sandbox.paypal.com/checkoutnow?token=ORDEN123", inicio.urlPago());
         assertEquals(Pedido.PENDIENTE, inicio.pedido().getEstado());
         return inicio.pedido();
@@ -102,10 +105,11 @@ class PagoServiceTests {
         assertEquals(pedido.getFolio(), usuario.getSuscripcion().getTransaccionId());
         assertTrue(carrito.getItems().isEmpty());
 
-        // Recargar la página no vuelve a cobrar ni a enviar el ticket
+        // Recargar la página no vuelve a cobrar ni a enviar el ticket o el aviso
         pagoService.confirmar(pedido, "ORDEN123");
         verify(payPal, times(1)).capturar("ORDEN123");
         verify(correoService, times(1)).enviarTicket(pedido);
+        verify(notificacionService, times(1)).avisarCompra(pedido);
     }
 
     @Test
@@ -152,7 +156,7 @@ class PagoServiceTests {
         assertEquals(Pedido.RECHAZADO, pedido.getEstado());
         assertEquals(2, carrito.getItems().size());
 
-        Pedido otro = pagoService.iniciar(comprador, PagoService.PAYPAL).pedido();
+        Pedido otro = pagoService.iniciar(comprador, PagoService.PAYPAL, "pc").pedido();
         pagoService.cancelar(otro);
         assertEquals(Pedido.CANCELADO, otro.getEstado());
         assertEquals(2, carrito.getItems().size());
@@ -163,7 +167,7 @@ class PagoServiceTests {
         when(payPal.estaConfigurado()).thenReturn(false);
         carritoService.agregar(comprador, "plan-free", 1);
 
-        PagoService.Inicio inicio = pagoService.iniciar(comprador, PagoService.PAYPAL);
+        PagoService.Inicio inicio = pagoService.iniciar(comprador, PagoService.PAYPAL, "pc");
 
         assertNull(inicio.urlPago());
         assertEquals(Pedido.PAGADO, inicio.pedido().getEstado());
@@ -176,7 +180,7 @@ class PagoServiceTests {
         when(payPal.estaConfigurado()).thenReturn(false);
         carritoService.agregar(comprador, "kit-piloto", 1);
 
-        assertThrows(PagoNoDisponibleException.class, () -> pagoService.iniciar(comprador, PagoService.PAYPAL));
+        assertThrows(PagoNoDisponibleException.class, () -> pagoService.iniciar(comprador, PagoService.PAYPAL, "pc"));
         assertTrue(pedidos.isEmpty());
     }
 
@@ -186,7 +190,7 @@ class PagoServiceTests {
         when(stripe.crearSesion(any())).thenReturn(new StripeService.Sesion("cs_test_123", "https://checkout.stripe.com/c/pay/cs_test_123"));
         carritoService.agregar(comprador, "kit-piloto", 1);
         carritoService.agregar(comprador, "plan-standard", 1);
-        PagoService.Inicio inicio = pagoService.iniciar(comprador, PagoService.STRIPE);
+        PagoService.Inicio inicio = pagoService.iniciar(comprador, PagoService.STRIPE, "pc");
         assertEquals("https://checkout.stripe.com/c/pay/cs_test_123", inicio.urlPago());
         assertEquals("stripe_test", inicio.pedido().getMetodoPago());
         verify(payPal, never()).crearOrden(any());
@@ -273,7 +277,7 @@ class PagoServiceTests {
         paynetConfigurado();
         carritoService.agregar(comprador, "kit-piloto", 1);
 
-        PagoService.Inicio inicio = pagoService.iniciar(comprador, PagoService.PAYNET);
+        PagoService.Inicio inicio = pagoService.iniciar(comprador, PagoService.PAYNET, "pc");
 
         Pedido pedido = inicio.pedido();
         assertNull(inicio.urlPago());
@@ -295,7 +299,7 @@ class PagoServiceTests {
         carritoService.agregar(comprador, "kit-piloto", 1);
 
         assertFalse(pagoService.metodosDisponibles().contains(PagoService.PAYNET));
-        assertThrows(PagoService.PagoNoDisponibleException.class, () -> pagoService.iniciar(comprador, PagoService.PAYNET));
+        assertThrows(PagoService.PagoNoDisponibleException.class, () -> pagoService.iniciar(comprador, PagoService.PAYNET, "pc"));
     }
 
     @Test
@@ -305,7 +309,7 @@ class PagoServiceTests {
         carritoService.agregar(invitado, "kit-piloto", 1); // llenar el carrito sí se puede
 
         for (String metodo : List.of(PagoService.PAYPAL, PagoService.STRIPE, PagoService.PAYNET)) {
-            assertThrows(PagoService.SesionRequeridaException.class, () -> pagoService.iniciar(invitado, metodo));
+            assertThrows(PagoService.SesionRequeridaException.class, () -> pagoService.iniciar(invitado, metodo, "pc"));
         }
         assertTrue(pedidos.isEmpty());
         verify(payPal, never()).crearOrden(any());
