@@ -1,6 +1,6 @@
 # FluxGuard
 
-Entra a la pagina con el siguiente link: https://fluxguardcorporation.onrender.com
+Entra a la pagina con el siguiente link: https://fluxguardcorporation.com
 
 Plataforma web de monitoreo eléctrico IoT. Backend en Spring Boot 3.5 (Java 17) con MongoDB Atlas; el frontend estático se sirve desde `src/main/resources/static`.
 
@@ -12,7 +12,7 @@ Plataforma web de monitoreo eléctrico IoT. Backend en Spring Boot 3.5 (Java 17)
 | Variable | Uso |
 | --- | --- |
 | `MONGODB_URI`, `MONGODB_DATABASE` | Conexión a MongoDB Atlas |
-| `APP_BASE_URL` | URL pública; se usa en el enlace del correo de verificación |
+| `APP_BASE_URL` | URL pública: enlace del correo de verificación y regreso de PayPal y Stripe. Las páginas de cualquier otro dominio redirigen aquí |
 | `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, `BREVO_SENDER_NAME` | Envío del correo de verificación. Sin clave, el enlace se imprime en la consola |
 | `RESEND_API_KEY`, `RESEND_FROM_EMAIL` | Alternativa a Brevo: si `RESEND_API_KEY` tiene valor, los correos se envían con Resend. `RESEND_FROM_EMAIL` vacío usa `BREVO_SENDER_EMAIL` |
 | `CORS_ALLOWED_ORIGINS` | Dominios extra que pueden llamar a la API (separados por coma) |

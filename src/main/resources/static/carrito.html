@@ -131,6 +131,10 @@
       }
       const folio = params.get("pedido");
       if (folio) {
+        if (!conSesion()) {
+          irALoginParaConfirmar(folio, params.get("token"), params.get("cancelado") === "1");
+          return;
+        }
         // Se limpia la URL para que recargar la página no repita la confirmación
         history.replaceState(null, "", "carrito.html");
         await procesarRegreso(folio, params.get("token"), params.get("cancelado") === "1");
@@ -142,6 +146,14 @@
       } catch (error) {
         document.getElementById("checkout-box").innerHTML = `<p class="m-0">${escapeHtml(error.message)}</p>`;
       }
+    }
+
+    // El pedido es de una cuenta: sin sesión no se puede confirmar. El regreso se conserva para confirmarlo al entrar.
+    function irALoginParaConfirmar(folio, token, cancelado) {
+      const regreso = new URLSearchParams({ pedido: folio });
+      if (token) regreso.set("token", token);
+      if (cancelado) regreso.set("cancelado", "1");
+      window.location.replace("login.html?redirect=" + encodeURIComponent("carrito.html?" + regreso));
     }
 
     async function procesarRegreso(folio, token, cancelado) {
@@ -157,6 +169,10 @@
         const response = ruta
           ? await apiFetch(ruta, { method: "POST" })
           : await apiFetch(`/api/pedidos/${encodeURIComponent(folio)}`);
+        if (response.status === 401) {
+          irALoginParaConfirmar(folio, token, cancelado);
+          return;
+        }
         data = await response.json().catch(() => null);
         if (!response.ok || !data?.success) throw new Error(data?.message || "No se pudo consultar tu pedido.");
       } catch (error) {
