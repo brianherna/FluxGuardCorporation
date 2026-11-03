@@ -45,6 +45,7 @@ function cerrarSesion() {
   const token = localStorage.getItem("fluxg_token");
   localStorage.removeItem("fluxg_token");
   localStorage.removeItem("usuario");
+  localStorage.removeItem("fluxg_aviso_visto");
   if (token) {
     fetch(`${API_BASE}/api/auth/logout`, { method: "POST", headers: { "Authorization": `Bearer ${token}` } }).catch(() => {});
   }
@@ -129,7 +130,60 @@ document.addEventListener("DOMContentLoaded", () => {
   initPlanes();
   initCarrito();
   initSobrepantallas();
+  initAvisosCompra();
 });
+
+// ===== Avisos de compra =====
+// Con sesión iniciada revisa cada 30 s si hubo una compra en la cuenta (hecha aquí o en otro dispositivo)
+// y la muestra en pantalla y, si el navegador tiene permiso, como notificación del sistema.
+const INTERVALO_AVISOS_MS = 30000;
+
+function initAvisosCompra() {
+  if (!localStorage.getItem("fluxg_token")) return;
+  revisarAvisosCompra();
+  setInterval(revisarAvisosCompra, INTERVALO_AVISOS_MS);
+}
+
+async function revisarAvisosCompra() {
+  if (!localStorage.getItem("fluxg_token")) return;
+  try {
+    const response = await apiFetch("/api/notificaciones");
+    if (!response.ok) return;
+    const data = await response.json();
+    const visto = localStorage.getItem("fluxg_aviso_visto") || "";
+    const aviso = (data.notificaciones || []).find(n => !n.leida && n.fecha > visto);
+    if (!aviso) return;
+    localStorage.setItem("fluxg_aviso_visto", aviso.fecha);
+    mostrarAvisoCompra(aviso);
+  } catch {
+    // Sin conexión: se vuelve a intentar en la siguiente revisión
+  }
+}
+
+function mostrarAvisoCompra(aviso) {
+  document.getElementById("aviso-compra")?.remove();
+  const caja = document.createElement("div");
+  caja.id = "aviso-compra";
+  caja.className = "aviso-compra";
+  caja.setAttribute("role", "alert");
+  caja.innerHTML = `
+    <i class="bi bi-bag-check" aria-hidden="true"></i>
+    <div><strong></strong><p></p></div>
+    <button type="button" class="aviso-compra-ok">ENTENDIDO</button>`;
+  caja.querySelector("strong").textContent = aviso.titulo;
+  caja.querySelector("p").textContent = aviso.mensaje;
+  caja.querySelector("button").addEventListener("click", () => {
+    caja.remove();
+    apiFetch("/api/notificaciones/leidas", { method: "POST" }).catch(() => {});
+    // El navegador solo deja pedir el permiso tras un clic; así las siguientes llegan aunque la pestaña no esté a la vista
+    if ("Notification" in window && Notification.permission === "default") Notification.requestPermission();
+  });
+  document.body.appendChild(caja);
+
+  if ("Notification" in window && Notification.permission === "granted") {
+    new Notification(aviso.titulo, { body: aviso.mensaje, tag: aviso.id, icon: "assets/fluxguard-logo.png" });
+  }
+}
 
 function initNavbar() {
   const toggle = document.getElementById("navbarToggle");

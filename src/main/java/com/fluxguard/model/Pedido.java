@@ -46,6 +46,9 @@ public class Pedido {
     private String metodoPago;
     private LocalDateTime pagadoEn;
 
+    /** Desde dónde se hizo la compra: "pc", "celular", "tablet" o "app" (ver NotificacionService.origenDesde). */
+    private String dispositivo;
+
     // Pago en tienda (Paynet): referencia, imagen del código de barras y fecha límite. urlPago guarda la ficha PDF.
     private String referenciaPago;
     private String codigoBarrasUrl;
@@ -162,6 +165,14 @@ public class Pedido {
 
     public void setPagadoEn(LocalDateTime pagadoEn) {
         this.pagadoEn = pagadoEn;
+    }
+
+    public String getDispositivo() {
+        return dispositivo;
+    }
+
+    public void setDispositivo(String dispositivo) {
+        this.dispositivo = dispositivo;
     }
 
     public String getNombreCliente() {

@@ -59,10 +59,12 @@ public class PagoService {
     private final UsuarioRepository usuarioRepository;
     private final SuscripcionService suscripcionService;
     private final CorreoService correoService;
+    private final NotificacionService notificacionService;
 
     public PagoService(CarritoService carritoService, PayPalService payPal, StripeService stripe, OpenpayService openpay,
                        PedidoRepository pedidoRepository, UsuarioRepository usuarioRepository,
-                       SuscripcionService suscripcionService, CorreoService correoService) {
+                       SuscripcionService suscripcionService, CorreoService correoService,
+                       NotificacionService notificacionService) {
         this.carritoService = carritoService;
         this.payPal = payPal;
         this.stripe = stripe;
@@ -71,6 +73,7 @@ public class PagoService {
         this.usuarioRepository = usuarioRepository;
         this.suscripcionService = suscripcionService;
         this.correoService = correoService;
+        this.notificacionService = notificacionService;
     }
 
     /** Métodos de pago configurados en el servidor, para que carrito.html solo muestre los que funcionan. */
@@ -86,8 +89,10 @@ public class PagoService {
      * Crea el pedido del carrito y el pago en el proveedor elegido ("paypal", "stripe" o "paynet").
      * Solo con sesión iniciada: al crear la cuenta el cliente aceptó las políticas de compra, envío y devoluciones.
      * Un pedido de $0 (solo Plan Free) se completa sin cobro.
+     *
+     * @param dispositivo desde dónde se compra (NotificacionService.origenDesde); se muestra en el aviso de la compra
      */
-    public Inicio iniciar(Comprador comprador, String metodo) {
+    public Inicio iniciar(Comprador comprador, String metodo, String dispositivo) {
         if (comprador.esInvitado()) {
             throw new SesionRequeridaException();
         }
@@ -103,6 +108,7 @@ public class PagoService {
         }
 
         Pedido pedido = carritoService.crearPedido(comprador);
+        pedido.setDispositivo(dispositivo);
         if (pedido.getTotal() == 0) {
             pedido.setMetodoPago("sin_costo");
             completar(pedido);
@@ -236,7 +242,7 @@ public class PagoService {
         return pedido;
     }
 
-    /** Marca el pedido como pagado, activa el plan que incluya, vacía el carrito y envía el ticket por correo. */
+    /** Marca el pedido como pagado, activa el plan que incluya, vacía el carrito, envía el ticket y avisa al dueño de la cuenta. */
     private void completar(Pedido pedido) {
         pedido.setEstado(Pedido.PAGADO);
         pedido.setPagadoEn(LocalDateTime.now());
@@ -265,6 +271,7 @@ public class PagoService {
 
         carritoService.vaciar(pedido.getUsuarioId());
         enviarTicket(pedido);
+        notificacionService.avisarCompra(pedido);
     }
 
     /** El ticket se envía una sola vez, al pasar a PAGADO. Si el correo falla, el pago sigue confirmado. */
