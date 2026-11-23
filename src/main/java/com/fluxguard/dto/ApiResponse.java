@@ -27,6 +27,7 @@ public class ApiResponse<T> {
     private List<String> metodosPago;
     private List<Notificacion> notificaciones;
     private Long noLeidas;
+    private String respuesta;
 
     public ApiResponse() {}
 
@@ -185,5 +186,13 @@ public class ApiResponse<T> {
 
     public void setNoLeidas(Long noLeidas) {
         this.noLeidas = noLeidas;
+    }
+
+    public String getRespuesta() {
+        return respuesta;
+    }
+
+    public void setRespuesta(String respuesta) {
+        this.respuesta = respuesta;
     }
 }

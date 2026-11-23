@@ -26,6 +26,7 @@ Plataforma web de monitoreo eléctrico IoT. Backend en Spring Boot 3.5 (Java 17)
 | `STRIPE_SECRET_KEY` | Llave secreta de Stripe (`sk_test_...` = modo de prueba). Vacía = no aparece el pago con tarjeta |
 | `STRIPE_WEBHOOK_SECRET` | Secreto del webhook de Stripe (`whsec_...`), para confirmar pagos aunque el cliente no regrese a la página |
 | `FIREBASE_SERVICE_ACCOUNT_JSON` | Cuenta de servicio de Firebase en una sola línea, para el push a la app móvil. Vacía = sin push; los avisos se ven al abrir la app o la web |
+| `ANTHROPIC_API_KEY` | Llave de la API de Anthropic para el asistente de la app móvil (`POST /api/asistente`, modelo `claude-opus-5-5`). Cada respuesta tiene costo; hay un límite de 30 preguntas por hora por cuenta. Vacía = el asistente no está disponible |
 
 En Render, define las mismas variables en el panel del servicio.
 
@@ -66,6 +67,7 @@ docker build -t fluxguard . && docker run --env-file .env -p 8080:8080 fluxguard
 | GET | `/api/notificaciones` | Avisos de la cuenta (p. ej. "Alguien compró en tu cuenta") y cuántos faltan por leer |
 | POST | `/api/notificaciones/leidas` | Marca todos los avisos como leídos |
 | POST | `/api/notificaciones/dispositivos` | Registra el celular que recibe push (`token`, `plataforma`: `android` o `ios`) |
+| POST | `/api/asistente` | Asistente de la app (con sesión). Cuerpo: `mensajes` con `rol` (`usuario`/`asistente`) y `texto`; responde `respuesta` |
 | POST | `/api/notificaciones/dispositivos/quitar` | Deja de enviar push a ese celular (la app lo llama al cerrar sesión) |
 | GET | `/api/health` | Estado del servicio |
 
