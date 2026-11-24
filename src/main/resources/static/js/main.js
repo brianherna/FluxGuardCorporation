@@ -594,6 +594,10 @@ function initAuthForms() {
       showAlert(alertBox, "success", "<strong>¡Correo verificado!</strong> Tu cuenta está activa. Ya puedes iniciar sesión.");
     } else if (verificacion === "expirado") {
       showAlert(alertBox, "danger", "El enlace de verificación expiró. Inicia sesión con tu correo y contraseña para recibir uno nuevo.");
+    } else if (verificacion === "correo") {
+      showAlert(alertBox, "success", "<strong>¡Listo!</strong> Tu nuevo correo quedó confirmado. Desde ahora inicia sesión con él.");
+    } else if (verificacion === "ocupado") {
+      showAlert(alertBox, "danger", "No pudimos cambiar tu correo porque ya hay otra cuenta con él. Tu correo anterior sigue activo.");
     } else if (verificacion === "invalido") {
       showAlert(alertBox, "danger", "El enlace de verificación no es válido o ya fue usado. Si ya verificaste tu cuenta, inicia sesión.");
     }

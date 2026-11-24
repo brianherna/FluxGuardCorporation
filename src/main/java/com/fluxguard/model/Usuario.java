@@ -26,6 +26,8 @@ public class Usuario {
     private String tokenVerificacionHash;
     private LocalDateTime tokenExpira;
     private LocalDateTime tokenEnviadoEn;
+    // Correo nuevo que el usuario pidió desde su perfil; reemplaza a "correo" cuando abre el enlace que se le envió
+    private String correoPendiente;
 
     private Suscripcion suscripcion;
 
@@ -152,5 +154,13 @@ public class Usuario {
 
     public void setVersionAvisoPrivacidad(String versionAvisoPrivacidad) {
         this.versionAvisoPrivacidad = versionAvisoPrivacidad;
+    }
+
+    public String getCorreoPendiente() {
+        return correoPendiente;
+    }
+
+    public void setCorreoPendiente(String correoPendiente) {
+        this.correoPendiente = correoPendiente;
     }
 }

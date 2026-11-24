@@ -68,6 +68,9 @@ docker build -t fluxguard . && docker run --env-file .env -p 8080:8080 fluxguard
 | POST | `/api/notificaciones/leidas` | Marca todos los avisos como leídos |
 | POST | `/api/notificaciones/dispositivos` | Registra el celular que recibe push (`token`, `plataforma`: `android` o `ios`) |
 | POST | `/api/asistente` | Asistente de la app (con sesión). Cuerpo: `mensajes` con `rol` (`usuario`/`asistente`) y `texto`; responde `respuesta` |
+| PUT | `/api/cuenta/datos` | Cambia nombre y apellido (con sesión) |
+| POST | `/api/cuenta/contrasena` | Cambia la contraseña: pide `contrasenaActual` y cierra las demás sesiones |
+| POST | `/api/cuenta/correo` | Pide cambiar el correo: envía un enlace al nuevo y el cambio se aplica al abrirlo |
 | POST | `/api/notificaciones/dispositivos/quitar` | Deja de enviar push a ese celular (la app lo llama al cerrar sesión) |
 | GET | `/api/health` | Estado del servicio |
 

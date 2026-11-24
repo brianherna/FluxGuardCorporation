@@ -69,6 +69,14 @@ public class SesionService {
         }
     }
 
+    /** Cierra las demás sesiones del usuario (p. ej. al cambiar la contraseña) y conserva la del encabezado. */
+    public void cerrarOtras(Usuario usuario, String authorization) {
+        String token = extraerToken(authorization);
+        if (token != null) {
+            sesionRepository.deleteByUsuarioIdAndTokenHashNot(usuario.getId(), Tokens.sha256(token));
+        }
+    }
+
     private static String extraerToken(String authorization) {
         if (authorization == null || !authorization.startsWith(PREFIJO)) {
             return null;

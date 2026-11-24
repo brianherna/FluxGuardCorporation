@@ -7,6 +7,7 @@ import com.fluxguard.dto.ReenvioRequest;
 import com.fluxguard.dto.UsuarioDto;
 import com.fluxguard.model.Usuario;
 import com.fluxguard.repository.UsuarioRepository;
+import com.fluxguard.service.Contrasenas;
 import com.fluxguard.service.CorreoService;
 import com.fluxguard.service.SesionService;
 import com.fluxguard.service.Tokens;
@@ -78,9 +79,9 @@ public class AuthController {
                     .body(ApiResponse.error("El correo electrónico no es válido."));
         }
 
-        if (password.length() < 8 || !tieneMayuscula(password) || !tieneCaracterEspecial(password)) {
+        if (!Contrasenas.esSegura(password)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body(ApiResponse.error("La contraseña debe tener al menos 8 caracteres, una letra mayúscula y un carácter especial (ej. @, #, $, !, %)."));
+                    .body(ApiResponse.error(Contrasenas.REGLA));
         }
 
         if (!Boolean.TRUE.equals(request.getAceptaPrivacidad())) {
@@ -219,7 +220,10 @@ public class AuthController {
         return ResponseEntity.ok(ApiResponse.ok("Sesión cerrada"));
     }
 
-    /** Devuelve "ok", "expirado" o "invalido" según el token del enlace. */
+    /**
+     * Devuelve "ok", "expirado" o "invalido" según el token del enlace. Si el enlace era para cambiar el correo
+     * desde el perfil, devuelve "correo" al aplicarlo u "ocupado" si mientras tanto otra cuenta tomó ese correo.
+     */
     private String verificarToken(String token) {
         if (token.isEmpty() || token.length() > 100) {
             return "invalido";
@@ -235,11 +239,19 @@ public class AuthController {
             return "expirado";
         }
 
+        String resultado = "ok";
+        if (usuario.getCorreoPendiente() != null) {
+            resultado = usuarioRepository.existsByCorreo(usuario.getCorreoPendiente()) ? "ocupado" : "correo";
+            if ("correo".equals(resultado)) {
+                usuario.setCorreo(usuario.getCorreoPendiente());
+            }
+            usuario.setCorreoPendiente(null);
+        }
         usuario.setVerificado(true);
         usuario.setTokenVerificacionHash(null);
         usuario.setTokenExpira(null);
         usuarioRepository.save(usuario);
-        return "ok";
+        return resultado;
     }
 
     /** Genera un token aleatorio, guarda solo su hash en el usuario y devuelve el token en claro para el enlace. */
@@ -275,24 +287,5 @@ public class AuthController {
         response.setRequiereVerificacion(true);
         response.setCorreo(usuario.getCorreo());
         return response;
-    }
-
-    private boolean tieneMayuscula(String pwd) {
-        for (char c : pwd.toCharArray()) {
-            if (Character.isUpperCase(c)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private boolean tieneCaracterEspecial(String pwd) {
-        String especiales = "!@#$%^&*(),.?\":{}|<>_-\\/[]~`+=";
-        for (char c : pwd.toCharArray()) {
-            if (especiales.indexOf(c) >= 0) {
-                return true;
-            }
-        }
-        return false;
     }
 }

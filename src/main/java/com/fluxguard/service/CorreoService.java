@@ -38,6 +38,13 @@ public class CorreoService {
         }
     }
 
+    /** Envía el enlace para confirmar el correo nuevo pedido desde el perfil. Lanza RestClientException si el proveedor lo rechaza. */
+    public void enviarCambioDeCorreo(String correo, String nombre, String enlace, int horasVigencia) {
+        enviar(new Correo(correo, nombre, PlantillaVerificacion.ASUNTO_CAMBIO,
+                PlantillaVerificacion.htmlCambio(nombre, enlace, horasVigencia),
+                PlantillaVerificacion.textoCambio(nombre, enlace, horasVigencia), null));
+    }
+
     /**
      * Envía el ticket de un pedido pagado al correo del cliente, con el PDF adjunto.
      * Lanza RestClientException si el proveedor lo rechaza.
