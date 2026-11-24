@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface SesionRepository extends MongoRepository<Sesion, String> {
     Optional<Sesion> findByTokenHash(String tokenHash);
     void deleteByTokenHash(String tokenHash);
+    void deleteByUsuarioIdAndTokenHashNot(String usuarioId, String tokenHash);
 }

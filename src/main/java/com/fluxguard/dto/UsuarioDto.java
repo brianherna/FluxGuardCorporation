@@ -14,6 +14,7 @@ public class UsuarioDto {
     private String correo;
     private LocalDateTime fechaRegistro;
     private Suscripcion suscripcion;
+    private String correoPendiente;
 
     public UsuarioDto() {}
 
@@ -34,6 +35,7 @@ public class UsuarioDto {
                 usuario.getFechaRegistro()
         );
         dto.setSuscripcion(usuario.getSuscripcion());
+        dto.setCorreoPendiente(usuario.getCorreoPendiente());
         return dto;
     }
 
@@ -83,5 +85,13 @@ public class UsuarioDto {
 
     public void setSuscripcion(Suscripcion suscripcion) {
         this.suscripcion = suscripcion;
+    }
+
+    public String getCorreoPendiente() {
+        return correoPendiente;
+    }
+
+    public void setCorreoPendiente(String correoPendiente) {
+        this.correoPendiente = correoPendiente;
     }
 }
